@@ -23,26 +23,35 @@ DATABASE_DIR = BASE_DIR / "database"
 OUTPUT_DIR = BASE_DIR / "output"
 SQL_DIR = BASE_DIR / "sql"
 
-# Arquivos padrão de entrada, persistência, saída e consultas analíticas
+# Arquivos padrão de entrada, persistência, saídas (CSV e HTML) e consultas analíticas
 CSV_PATH = DATA_DIR / "medicoes.csv"
 DATABASE_PATH = DATABASE_DIR / "power_monitor.db"
 OUTPUT_PATH = OUTPUT_DIR / "relatorio.csv"
+HTML_OUTPUT_PATH = OUTPUT_DIR / "relatorio.html"
 SQL_QUERIES_PATH = SQL_DIR / "queries.sql"
 
 # -----------------------------------------------------------------------------
 # 2. Premissas de Engenharia Elétrica e Tarifação
 # -----------------------------------------------------------------------------
 # INTERVALO_HORAS: Intervalo de tempo regular (Δt) entre medições consecutivas, em horas.
-# - Na integração numérica da energia (E = ∫ P dt ≈ Σ P_i * Δt), este fator converte
-#   potência média (kW) em energia consumida (kWh).
-# - O pipeline suporta: 1.0 (amostragem horária), 0.5 (30 min) e 0.25 (15 min, padrão
-#   utilizado em medição para faturamento de consumidores do Grupo A pelas concessionárias).
+# - Na integração da energia ativa (E = P_média * Δt), este fator converte
+#   potência média (kW) em energia consumida (kWh). Essa é uma relação física de conversão.
+# - O pipeline suporta intervalos de: 1.0 (1h), 0.5 (30 min) e 0.25 (15 min).
+#   A resolução de 15 minutos é uma capacidade técnica de amostragem temporal dos dados
+#   e não torna o PowerMonitor um sistema de apuração de faturamento regulatório.
 INTERVALO_HORAS = 1.0
 
-# TARIFA_KWH: Tarifa didática de energia elétrica em Reais por quilowatt-hora (R$/kWh).
-# - Utilizada para simulação linear simples de custo financeiro: Custo = E * Tarifa.
-# - Observação de Engenharia: Em tarifas reais (ex: Grupo A ou Tarifa Branca), a tarifação
-#   é horossazonal (postos ponta e fora de ponta), com parcelas separadas para demanda
-#   faturada (R$/kW) e consumo de energia (R$/kWh), além de bandeiras tarifárias e tributos.
+# TARIFA_KWH: Tarifa didática de referência em Reais por quilowatt-hora (R$/kWh).
+# - Utilizada para simulação simplificada de custo: Custo = E * Tarifa.
+# - Trata-se de uma hipótese de cálculo configurável; não representa fatura de energia
+#   nem valor devido à distribuidora.
+# - Distinção regulatória (REN ANEEL nº 1.000/2021):
+#   * No Grupo A (Art. 294), há cobrança de demanda de potência (em R$/kW) e de consumo
+#     de energia ativa (em R$/kWh), diferenciada por postos horários (ponta e fora de ponta).
+#   * Na Modalidade Horária Branca do Grupo B (Art. 212), há apenas diferenciação da tarifa
+#     de consumo de energia ativa (em R$/kWh) entre postos ponta, intermediário e fora de ponta,
+#     sem cobrança de demanda em R$/kW.
+#   * O PowerMonitor não calcula faturamento regulado, custo de disponibilidade, ultrapassagem,
+#     bandeiras tarifárias ou tributos (ICMS/PIS/COFINS).
 TARIFA_KWH = 0.75
 

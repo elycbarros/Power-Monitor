@@ -38,6 +38,7 @@ from src.database import get_connection, create_tables, insert_medicoes, query_t
 from src.import_data import load_and_validate_csv, identificar_lacunas_temporais, formatar_resumo_lacunas
 from src.analysis import gerar_indicadores_completos
 from src.report import exibir_relatorio_terminal, exportar_relatorio_csv
+from src.html_report import construir_conteudo_html, salvar_relatorio_html
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -103,6 +104,21 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=config.INTERVALO_HORAS,
         help="Intervalo regular entre medições em horas (0.25 para 15 min, 0.5 para 30 min, 1.0 para 1h).",
     )
+    parser.add_argument(
+        "--html",
+        dest="html_path",
+        type=Path,
+        default=config.HTML_OUTPUT_PATH,
+        help="Caminho para exportação do relatório visual em HTML estático.",
+    )
+    parser.add_argument(
+        "--origem-dados",
+        dest="origem_dados",
+        type=str,
+        default=None,
+        choices=["simulados", "reais", "nao_informada"],
+        help="Origem dos dados ('simulados', 'reais' ou 'nao_informada'; default: não informada).",
+    )
     return parser.parse_args(argv)
 
 
@@ -112,6 +128,8 @@ def executar_pipeline(
     database_path: Optional[Union[str, Path]] = None,
     output_path: Optional[Union[str, Path]] = None,
     intervalo_horas: Optional[float] = None,
+    html_path: Optional[Union[str, Path]] = None,
+    origem_dados: Optional[str] = None,
 ) -> int:
     """Executa sequencialmente todas as etapas do pipeline ETL e analítico do PowerMonitor.
 
@@ -122,7 +140,7 @@ def executar_pipeline(
         3. Armazenamento seguro em banco de dados histórico para auditoria legal;
         4. Diagnóstico de qualidade da série temporal (cobertura e lacunas por falta de energia);
         5. Consolidação de balanço de potência, energia acumulada, pico e fator de carga;
-        6. Emissão do boletim diário de operação e planilha para faturamento.
+        6. Emissão do boletim diário de operação e planilha para exportação de dados analíticos.
 
     Conceito de Programação:
         - Pipeline ETL (Extract, Transform, Load) + Análise:
@@ -152,6 +170,7 @@ def executar_pipeline(
     tarifa = tarifa_kwh if tarifa_kwh is not None else config.TARIFA_KWH
     db_file = Path(database_path) if database_path is not None else config.DATABASE_PATH
     out_file = Path(output_path) if output_path is not None else config.OUTPUT_PATH
+    html_file = Path(html_path) if html_path is not None else config.HTML_OUTPUT_PATH
     intervalo = intervalo_horas if intervalo_horas is not None else config.INTERVALO_HORAS
 
     # 1. Validação de Parâmetros de Configuração
@@ -277,16 +296,39 @@ def executar_pipeline(
         estatisticas_lote=estatisticas_lote,
         avisos_lote=relatorio_validacao["avisos"],
         avisos_historico=avisos_historico,
+        intervalo_horas=intervalo,
     )
 
     # 7. Exportar Relatório para CSV
     try:
         exportar_relatorio_csv(indicadores, df_diario, out_file)
-        print(f"-> Relatório exportado com sucesso para: {out_file}\n")
+        print(f"-> Relatório consolidado em CSV exportado para: {out_file}")
     except Exception as e:
         print(
             f"\n[ERRO] As medições foram persistidas no banco com sucesso, "
             f"mas a exportação do relatório CSV falhou: {e}"
+        )
+        return 1
+
+    # 8. Exportar Relatório Visual para HTML
+    try:
+        conteudo_html = construir_conteudo_html(
+            indicadores=indicadores,
+            df_diario=df_diario,
+            df_historico=df_db,
+            estatisticas_lote=estatisticas_lote,
+            avisos_lote=relatorio_validacao["avisos"],
+            avisos_historico=avisos_historico,
+            intervalo_horas=intervalo,
+            origem_dados=origem_dados,
+        )
+        salvar_relatorio_html(conteudo_html, html_file)
+        print(f"-> Relatório visual HTML gerado com sucesso em: {html_file}")
+        print(f"   Para visualizar: abra o arquivo no navegador (ex: open {html_file} no macOS ou start {html_file} no Windows)\n")
+    except Exception as e:
+        print(
+            f"\n[ERRO] As medições foram persistidas no banco com sucesso e o CSV gerado, "
+            f"mas a exportação do relatório HTML falhou: {e}"
         )
         return 1
 
@@ -302,5 +344,7 @@ if __name__ == "__main__":
             database_path=cli_args.database_path,
             output_path=cli_args.output_path,
             intervalo_horas=cli_args.intervalo_horas,
+            html_path=cli_args.html_path,
+            origem_dados=cli_args.origem_dados,
         )
     )

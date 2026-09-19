@@ -400,11 +400,11 @@ Use este roteiro estruturado quando pedirem para você apresentar o projeto em u
 ### Minuto 5: Confiabilidade, Testes e Escalabilidade
 > *"Por fim, apliquei práticas profissionais de qualidade de software:*
 >
-> *O projeto conta com **36 testes automatizados com pytest**, cobrindo validações de entrada, transações SQL, cálculos estatísticos e integridade de pipeline, atingindo **89% de cobertura de código**.*
+> *O projeto conta com **42 testes automatizados com pytest**, cobrindo validações de entrada, transações SQL, cálculos estatísticos e integridade de pipeline, atingindo **89% de cobertura de código**.*
 >
 > *Configurei um pipeline de **CI (Integração Contínua) no GitHub Actions**, que executa todos os testes a cada push ou pull request em ambiente limpo Linux.*
 >
-> *A arquitetura foi desenhada para evoluir facilmente: podemos plugar tarifas horossazonais (ponta/fora de ponta da Resolução 1.000 da ANEEL) ou trocar o SQLite por PostgreSQL sem alterar as fórmulas do módulo analítico."*
+> *A arquitetura foi desenhada para evoluir facilmente: podemos plugar faixas horárias inspiradas na Tarifa Branca para baixa tensão (Art. 212 da REN ANEEL 1.000/2021) ou estruturas binômias do Grupo A (Art. 294) e trocar o SQLite por PostgreSQL sem alterar as fórmulas do módulo analítico."*
 
 ---
 
@@ -424,7 +424,7 @@ Use este roteiro estruturado quando pedirem para você apresentar o projeto em u
 
 ### P4: "Se uma indústria apresentar Fator de Carga de 0,40, podemos afirmar que as máquinas dela são energeticamente ineficientes?"
 **Resposta Recomendada:**
-> *"Não. Essa é uma confusão comum entre **uniformidade de curva de carga** e **rendimento eletromecânico**. Um fator de carga de 0,40 (ou 40%) significa apenas que a potência média foi 40% do pico de demanda registrado no período — por exemplo, uma fábrica que opera em apenas um turno diário de 8 horas e desliga à noite. Os motores podem ter selo Procel A de altíssima eficiência; o FC baixo reflete o perfil operacional e a ociosidade da demanda contratada, não o desperdício intrínseco dos equipamentos."*
+> *"Não. Essa é uma confusão comum entre **uniformidade de curva de carga** e **rendimento eletromecânico**. Um fator de carga de 0,40 (ou 40%) significa apenas que a potência média foi 40% do pico de demanda registrado no período — por exemplo, uma fábrica que opera em apenas um turno diário de 8 horas e desliga à noite. Os motores podem ter selo Procel A de altíssima eficiência; o FC baixo reflete o perfil operacional e a modulação da carga, não o desperdício intrínseco dos equipamentos. Além disso, o Fator de Carga não se confunde com o Fator de Potência ($\cos \varphi$, Art. 302 da REN 1.000), que relaciona potência ativa e aparente."*
 
 ### P5: "Como o sistema reage se o registrador reenviar as mesmas medições no dia seguinte?"
 **Resposta Recomendada:**
@@ -434,9 +434,9 @@ Use este roteiro estruturado quando pedirem para você apresentar o projeto em u
 **Resposta Recomendada:**
 > *"Funções puras dependem exclusivamente de seus argumentos de entrada e retornam saídas previsíveis, sem modificar o ambiente externo ('side effects'). Isso torna os testes unitários extremamente rápidos, baratos e determinísticos: podemos injetar pequenos DataFrames artificiais criados em memória e testar todas as condições de contorno (listas vazias, valores nulos, empates de demanda) sem depender de conexões com disco ou arquivos físicos."*
 
-### P7: "Qual a diferença entre a Demanda Máxima apurada no seu projeto e a Demanda Contratada na fatura da concessionária?"
+### P7: "Qual a diferença entre a Demanda apurada no seu projeto, a Demanda Medida e a Demanda Contratada na fatura de concessionária?"
 **Resposta Recomendada:**
-> *"A Demanda Máxima apurada no projeto é a maior potência média observada nas amostras do histórico analisado. A Demanda Contratada, por sua vez, é um valor contratual fixo em kW acordado previamente entre o consumidor do Grupo A e a distribuidora de energia elétrica (conforme regras da ANEEL). Se a demanda máxima medida ultrapassar a contratada em mais de 5%, a unidade sofre cobrança de ultrapassagem tarifária. O PowerMonitor fornece a visibilidade do pico medido exatamente para subsidiar a gestão e ajuste dessa demanda contratada."*
+> *"A Demanda apurada no PowerMonitor é a maior potência média observada no passo amostral dos dados ($\Delta t$). Já a Demanda Medida regulamentada pela REN ANEEL nº 1.000/2021 (Art. 2º, XIII) é a maior potência ativa integrada em blocos contínuos de 15 minutos ao longo de todo o ciclo de faturamento mensal contínuo. Por sua vez, a Demanda Contratada é um valor fixado contratualmente em kW entre a distribuidora e a unidade consumidora do Grupo A (Art. 294). Se a demanda medida superar a contratada em mais de 5%, a unidade sofre cobrança por ultrapassagem (Art. 301). O PowerMonitor fornece a visibilidade do perfil de carregamento para estudos de modulação de carga, sem configurar um sistema de faturamento homologado."*
 
 ---
 

@@ -105,10 +105,13 @@ def calcular_potencia_media(df: pd.DataFrame) -> float:
 def calcular_demanda_maxima(df: pd.DataFrame) -> Tuple[float, Optional[str]]:
     """Identifica a maior demanda de potência registrada (kW) e o carimbo de tempo da ocorrência.
 
-    Conceito Elétrico vs. Regulatório:
-    - Neste projeto didático, o pico é a maior potência média horária observada.
-    - No faturamento de concessionárias (resolução ANEEL), a demanda faturada é obtida
-      em blocos integrados de 15 minutos e comparada à demanda contratada.
+    Conceito Elétrico vs. Regulatório (REN ANEEL nº 1.000/2021):
+    - No escopo didático deste projeto, o pico calculado é a maior potência média observada
+      na resolução temporal dos dados (ex: média horária para amostragem de 1h).
+    - Na regulação setorial (Art. 2º, XIII), 'demanda medida' é estritamente a maior demanda
+      de potência ativa integralizada em intervalos de 15 minutos durante o período de faturamento.
+      O pico aqui calculado identifica a ocorrência máxima da série analisada, sem constituir
+      apurador de demanda faturável ou de ultrapassagem (Art. 301).
 
     Conceito de Programação: Ordenação e Desempate Determinístico ('sort_values')
     - Se houver dois picos iguais (ex: 20 kW às 09:00 e 20 kW às 18:00), qual deve ser exibido?
@@ -152,16 +155,17 @@ def calcular_demanda_maxima(df: pd.DataFrame) -> Tuple[float, Optional[str]]:
 
 
 def calcular_consumo_total(df: pd.DataFrame, intervalo_horas: float = 1.0) -> float:
-    """Calcula a energia elétrica total consumida no período em quilowatt-hora (kWh).
+    """Calcula a energia elétrica ativa total consumida no período em quilowatt-hora (kWh).
 
     Premissa e Análise Dimensional de Engenharia Elétrica:
-    - Potência (P) é taxa instantânea: 1 kW = 1 kJ/s.
-    - Energia (E) é a integral da potência no tempo: E = ∫ P(t) dt.
-    - Na discretização por degraus regulares de intervalo Δt (em horas):
-          E (kWh) = Σ (P_i [kW] * Δt [h])
-    - Se Δt = 1.0h, o valor numérico da potência média na hora coincide numericamente com
-      os kWh consumidos naquela hora (ex: 10 kW médios em 1h = 10 kWh).
-    - Se Δt = 0.25h (15 min), 10 kW médios geram: 10 * 0.25 = 2.5 kWh.
+    - Cada registro de potência representa a potência ativa média (kW) observada durante o intervalo amostral.
+    - A energia elétrica ativa consumida (kWh) é a integral da potência ativa média no tempo:
+          energia_kwh = potencia_media_kw * intervalo_horas
+          E (kWh) = Σ (P_média [kW] * Δt [h])
+    - Essa relação decorre estritamente da física de conservação de energia e conversão dimensional,
+      não constituindo uma convenção regulatória ou tarifária.
+    - Se Δt = 1.0h, o valor numérico da potência média na hora coincide com os kWh consumidos na hora.
+    - Se Δt = 0.25h (15 min), uma potência média de 10 kW gera: 10 * 0.25 = 2.5 kWh.
 
     Args:
         df: DataFrame contendo a coluna 'potencia_kw'.
@@ -280,25 +284,27 @@ def calcular_consumo_diario(df: pd.DataFrame, intervalo_horas: float = 1.0) -> p
 def calcular_fator_carga(potencia_media_kw: float, demanda_maxima_kw: float) -> Optional[float]:
     """Calcula o Fator de Carga (FC) da instalação elétrica.
 
-    Definição de Engenharia Elétrica:
-        FC = Potencia_Media / Demanda_Maxima = E / (P_max * T)
-    - O fator de carga é um número adimensional entre 0.0 e 1.0 (ou 0% a 100%).
-    - Significado físico: Quantifica a uniformidade ou modulação do uso da energia.
-      * FC próximo a 1.0 (100%): Curva de carga plana. A instalação utiliza sua demanda de
-        forma contínua e constante ao longo de todo o período.
-      * FC baixo (ex: 20% a 40%): Curva com picos elevados e vales profundos. A instalação
-        exige transformadores, cabos e disjuntores de grande porte para atender a ponta,
-        mas opera ociosa na maior parte do tempo.
+    Definição de Engenharia e Regulatória (REN ANEEL nº 1.000/2021, Art. 2º, XIX):
+        FC = Potencia_Media / Demanda_Maxima = Demanda_Media / Demanda_Maxima
+    - É a razão entre a demanda média e a demanda máxima da instalação no mesmo período de tempo.
+    - É um valor adimensional entre 0.0 e 1.0 (ou 0% a 100%).
+    - Dependência Metrológica: O valor do fator de carga depende estritamente da resolução
+      amostral (Δt) e da cobertura temporal dos dados. Na presença de lacunas ou dados incompletos,
+      sua interpretação fica estritamente restrita aos intervalos efetivamente medidos.
 
-    DISTINÇÃO FUNDAMENTAL EM ENTREVISTA:
-    - Fator de carga NÃO mede eficiência energética nem rendimento de máquinas!
-      Um motor antigo e ineficiente operando 24 horas por dia terá FC = 1.0 (100%).
-      Um equipamento supermoderno e eficiente que só liga 1 hora por dia terá FC muito baixo.
-      Portanto: FC mede perfil de uso da potência contratada, não rendimento.
+    Distinções Fundamentais de Engenharia:
+    1. Fator de Carga vs. Fator de Potência: O fator de carga reflete modulação e uniformidade
+       da curva de carga no tempo. NÃO deve ser confundido com o Fator de Potência (cos φ),
+       que é a relação entre potência ativa (kW) e potência aparente (kVA), regulado no Art. 302
+       da REN 1.000 com limite de referência indutivo/capacitivo de 0,92.
+    2. Fator de Carga vs. Eficiência de Equipamentos: O FC mede o grau de utilização contínua
+       da capacidade de demanda, e NÃO o rendimento de motores ou aparelhos. Um motor antigo
+       operando 24h/dia terá FC = 1.0 (100%), enquanto um motor ultrarrentável ligado apenas 1h/dia
+       terá FC baixo.
 
     Tratamento de Exceções e 'None':
-    - Se a demanda máxima for nula (0.0 kW), negativa ou NaN, a fórmula causaria divisão por zero.
-    - Retornamos 'None' ("Não Aplicável"), tratando o caso com rigor matemático.
+    - Se a demanda máxima for nula (0.0 kW), negativa ou NaN, retorna 'None' ("Não Aplicável"),
+      evitando divisões por zero ou valores sem sentido físico.
 
     Args:
         potencia_media_kw: Potência ativa média em kW.
@@ -415,17 +421,24 @@ def calcular_cobertura_medicoes(df: pd.DataFrame, intervalo_horas: float = 1.0) 
 
 
 def calcular_custo_estimado(consumo_kwh: float, tarifa_kwh: float) -> float:
-    """Calcula a estimativa proporcional de custo financeiro da energia consumida (R$).
+    """Calcula a estimativa simplificada de custo da energia elétrica ativa (R$).
 
     Fórmula: Custo (R$) = Consumo (kWh) * Tarifa (R$/kWh)
+
+    Escopo Educacional vs. Faturamento Regulado:
+    - Esta função calcula uma estimativa proporcional direta para fins didáticos e analíticos.
+    - NÃO constitui fatura de energia nem substitui faturamento de concessionária (REN ANEEL nº 1.000/2021).
+    - Não contempla componentes regulados de faturamento como: demanda faturável em R$/kW (Grupo A),
+      custo de disponibilidade (Grupo B, Art. 290-291), faixas horárias da Tarifa Branca (Art. 212),
+      adicionais de bandeiras tarifárias, tributos (ICMS, PIS, COFINS) ou cobrança por reativos excedentes (Art. 302).
 
     Precondições:
     - Consumo e tarifa devem ser números finitos não negativos (>= 0).
     - Valores NaN, Inf ou negativos disparam ValueError explicativo.
 
     Args:
-        consumo_kwh: Energia total em kWh.
-        tarifa_kwh: Tarifa em R$/kWh.
+        consumo_kwh: Energia total ativa em kWh.
+        tarifa_kwh: Tarifa monômia configurada em R$/kWh.
 
     Returns:
         float: Custo estimado em Reais.
@@ -449,12 +462,12 @@ def gerar_indicadores_completos(
     """Orquestra e consolida todos os indicadores técnicos em um contrato estruturado.
 
     Analogia com Engenharia Elétrica:
-        Esta função atua como um "painel de telemetria e faturamento" completo.
-        A partir da série temporal de potência ativa instantânea integrada no intervalo,
+        Esta função atua como um painel consolidado de telemetria e análise de consumo.
+        A partir da série temporal de potência ativa média integrada no intervalo,
         ela compila:
-        1. Balanço energético (Consumo total em kWh e Custo financeiro em R$);
+        1. Balanço energético (Consumo total em kWh e estimativa de custo simplificada em R$);
         2. Perfil de carregamento (Potência média e Demanda máxima de pico);
-        3. Fator de carga da instalação (eficiência de utilização da demanda contratada);
+        3. Fator de carga da instalação (uniformidade do uso da potência em relação ao pico registrado, Art. 2º, XIX);
         4. Agregação diária e dia crítico (maior consumo acumulado);
         5. Confiabilidade metrológica (cobertura temporal e horas ausentes).
 
@@ -561,7 +574,7 @@ def gerar_sintese_executiva(
         1. Contexto Metrológico: Quantifica medições reais e ressalta lacunas temporais,
            alertando que médias e fatores de carga refletem estritamente os intervalos medidos;
         2. Carregamento e Concentração: Destaca o instante da demanda de ponta e a concentração
-           de consumo diário (% da fatura acumulada em um único dia);
+           de consumo diário (% da energia total registrada no período);
         3. Fator de Carga Desmistificado: Explica tecnicamente que o FC mede modulação da curva
            de carga e taxa de utilização da infraestrutura elétrica, e NÃO eficiência dos motores/cargas;
         4. Recomendações Prudentes: Sugere investigação operacional de campo (curvas de carga,

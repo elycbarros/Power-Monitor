@@ -18,6 +18,8 @@ htmlcov/
 # Banco de dados e saídas locais
 database/*.db
 output/*.csv
+output/*.html
+output/*.tmp
 
 # Dados externos brutos volumosos
 data/raw/
@@ -33,4 +35,5 @@ data/*.txt
 
 # Documentação privada e demonstrações (não subir ao repositório)
 docs/apresentacao.md
+docs/*privado*
 *demo*

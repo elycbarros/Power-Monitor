@@ -56,14 +56,15 @@ def exibir_relatorio_terminal(
     estatisticas_lote: Optional[Dict[str, int]] = None,
     avisos_lote: Optional[List[str]] = None,
     avisos_historico: Optional[List[str]] = None,
+    intervalo_horas: float = 1.0,
 ) -> None:
     """Exibe no terminal os resultados consolidados do histórico com rigor técnico.
 
     Analogia com Engenharia Elétrica:
         Equivale à emissão do laudo técnico de inspeção de medição:
         - Demonstração do fluxo de auditoria metrológica (linhas lidas vs válidas vs descartadas);
-        - Consolidação temporal (período total, taxa de cobertura, horas ausentes);
-        - Grandezas elétricas fundamentais (potência média, pico de demanda horária e horário);
+        - Consolidação temporal (período total, taxa de cobertura, intervalos ausentes);
+        - Grandezas elétricas fundamentais (potência média, pico de demanda e respectivo horário);
         - Fator de carga acompanhado da ressalva de engenharia (modulação vs eficiência);
         - Tabela diária com segregação explícita de dias completos (24h) e parciais;
         - Síntese executiva orientada a investigação operacional.
@@ -81,6 +82,7 @@ def exibir_relatorio_terminal(
         estatisticas_lote: Dicionário opcional com a contabilidade da importação atual.
         avisos_lote: Lista opcional de mensagens de anomalias no arquivo CSV atual.
         avisos_historico: Lista opcional de avisos sobre a série histórica (ex: lacunas no banco).
+        intervalo_horas: Resolução amostral da medição em horas (default 1.0h).
     """
     separador_duplo = "=" * 76
     separador_simples = "-" * 76
@@ -88,6 +90,7 @@ def exibir_relatorio_terminal(
     print("\n" + separador_duplo)
     print("                      P O W E R M O N I T O R                       ")
     print("       Análise de Consumo e Demanda de Energia Elétrica (v1.0)       ")
+    print("                 Desenvolvido por Eng. Ely Barros                   ")
     print(separador_duplo)
 
     if estatisticas_lote:
@@ -139,16 +142,25 @@ def exibir_relatorio_terminal(
     print("\n[HISTÓRICO CONSOLIDADO NO BANCO SQLITE]")
     print(f"Total de medições no histórico: {total_med}")
     print(f"Período temporal coberto:       {p_inicio} a {p_fim}")
-    print(f"Cobertura temporal:             {h_medidas} de {h_esperadas} horas esperadas ({cob_str})\n")
+    unidade_passos = "horas esperadas" if intervalo_horas == 1.0 else "intervalos esperados"
+    print(f"Cobertura temporal:             {h_medidas} de {h_esperadas} {unidade_passos} ({cob_str})\n")
 
-    print(f"Potência média horária:\n  {pot_media} kW\n")
-    print(f"Maior potência média horária (demanda de pico):\n  {demanda_max} kW")
+    if intervalo_horas == 1.0:
+        rotulo_pot_media = "Potência média horária:"
+        rotulo_demanda_max = "Maior potência média horária (demanda de pico):"
+    else:
+        minutos_passo = int(round(intervalo_horas * 60))
+        rotulo_pot_media = f"Potência média (intervalo de {minutos_passo} min):"
+        rotulo_demanda_max = f"Maior potência média (demanda de pico, intervalo de {minutos_passo} min):"
+
+    print(f"{rotulo_pot_media}\n  {pot_media} kW\n")
+    print(f"{rotulo_demanda_max}\n  {demanda_max} kW")
     print(f"Horário da ocorrência de pico:\n  {horario_max}\n")
     print(f"Fator de carga da instalação:\n  {fc_str}")
     print("  (relação potência média / pico; indica uniformidade, não eficiência)\n")
     print(f"Energia consumida estimada no período:\n  {energia_tot} kWh")
     print(f"{rotulo_dia_max}\n  {dia_max_fmt} ({consumo_dia_max} kWh{nota_dia_max})\n")
-    print(f"Custo financeiro estimado (simulação simplificada):\n  R$ {custo_tot} (tarifa de referência: R$ {tarifa_fmt}/kWh)\n")
+    print(f"Simulação de custo (estimativa simplificada; não constitui fatura):\n  R$ {custo_tot} (tarifa didática de referência: R$ {tarifa_fmt}/kWh)\n")
 
     if avisos_lote:
         print(separador_simples)
@@ -204,14 +216,16 @@ def exibir_relatorio_terminal(
     print(sintese)
 
     print("\n" + separador_duplo)
-    print("NOTAS DE ENGENHARIA ELÉTRICA E LIMITAÇÕES:")
-    print("1. O pico refere-se à maior potência média horária registrada no histórico.")
-    print("   Não equivale à demanda contratada ou de faturamento regulada por concessionárias.")
-    print("2. O fator de carga reflete a uniformidade do perfil de consumo frente à capacidade de pico.")
-    print("   Não representa a eficiência dos aparelhos nem deve ser rotulado sem contexto operacional.")
-    print("3. Para dias parciais, o consumo contabiliza estritamente os intervalos registrados.")
-    print("4. Diferenças na soma das participações diárias decorrem de arredondamentos (ex: 99,99% ou 100,01%).")
-    print("5. O custo financeiro é uma estimativa linear simples sem tarifas horossazonais.")
+    print("NOTAS DE ENGENHARIA ELÉTRICA E LIMITAÇÕES REGULATÓRIAS:")
+    print("1. O pico refere-se à maior potência média no intervalo amostral (Δt).")
+    print("   Não equivale à demanda faturável ou contratada de concessionária (REN ANEEL nº 1.000/2021, Art. 2º, XIII).")
+    print("2. O fator de carga (Art. 2º, XIX) reflete a uniformidade do perfil frente ao pico registrado.")
+    print("   Não se confunde com o fator de potência (cos φ, Art. 302) nem com eficiência de equipamentos.")
+    print("3. A estimativa financeira é uma simulação linear simplificada para fins educacionais.")
+    print("   Não constitui fatura regulada: não inclui demanda em R$/kW, custo de disponibilidade,")
+    print("   faixas horárias de Tarifa Branca (Art. 212), bandeiras tarifárias ou tributos.")
+    print("4. Para dias parciais, o consumo contabiliza estritamente os intervalos registrados.")
+    print("5. Diferenças na soma das participações diárias decorrem de arredondamentos (ex: 99,99% ou 100,01%).")
     print(separador_duplo + "\n")
 
 

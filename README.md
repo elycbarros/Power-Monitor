@@ -1,9 +1,12 @@
 # PowerMonitor: Análise de Consumo e Demanda de Energia Elétrica
 
 [![CI - Testes e Qualidade](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml)
-[![Cobertura de Testes](https://img.shields.io/badge/cobertura-89%25-brightgreen.svg)](#5-executar-os-testes-automatizados-e-cobertura)
+[![Cobertura de Testes](https://img.shields.io/badge/cobertura-91%25-brightgreen.svg)](#5-executar-os-testes-automatizados-e-cobertura)
 
-O **PowerMonitor** é um projeto de portfólio desenvolvido para demonstrar a aplicação integrada de análise de dados, persistência relacional e conceitos práticos de Engenharia Elétrica na avaliação de séries temporais de consumo e demanda de energia.
+O **PowerMonitor** é um projeto de portfólio desenvolvido por **Eng. Ely Barros** para demonstrar a aplicação integrada de análise de dados, persistência relacional e conceitos práticos de Engenharia Elétrica na avaliação de séries temporais de consumo e demanda de energia.
+
+> [!NOTE]
+> O PowerMonitor é uma ferramenta educacional de análise de consumo elétrico. Os indicadores dependem da resolução e da cobertura das medições. A estimativa de custo é simplificada e não substitui cálculos de faturamento ou verificações de conformidade regulatória.
 
 ### Para que serve
 O pipeline responde com precisão e auditabilidade a três perguntas essenciais da análise de energia:
@@ -15,9 +18,9 @@ O pipeline responde com precisão e auditabilidade a três perguntas essenciais 
 Voltado a estudantes, profissionais recém-formados e analistas interessados em aplicações de dados e tecnologia à Engenharia Elétrica. O foco está no rigor dos contratos de dados, na qualidade das transformações, na correta interpretação física dos resultados e na reprodutibilidade da análise — sem complexidades desnecessárias nem pretensão de atuar como sistema SCADA industrial ou motor de faturamento de concessionária.
 
 ### Dados recebidos e resultados entregues
-- **Entrada:** Arquivo CSV com registros horários de data/hora local e potência ativa em quilowatts (`data_hora,potencia_kw`).
+- **Entrada:** Arquivo CSV com registros horários ou sub-horários de data/hora local e potência ativa em quilowatts (`data_hora,potencia_kw`).
 - **Processamento:** Validação temporal estrita, verificação de finitude numérica, persistência atômica em SQLite com `ROLLBACK` total em divergências e agregações com Pandas.
-- **Saídas:** Relatório estruturado no terminal com síntese interpretativa baseada em dados, arquivo local consolidado em `output/relatorio.csv` (com participação percentual de cada dia) e gráfico da curva de carga horária semanal.
+- **Saídas:** Relatório estruturado no terminal com síntese interpretativa baseada em dados, arquivo consolidado em `output/relatorio.csv` e relatório visual completo em HTML estático offline em `output/relatorio.html` (com curva de carga, barras de consumo diário, mapa de calor e tabela diária responsiva).
 
 ### Competências demonstradas
 - **Engenharia Elétrica Aplicada:** Conservação dimensional da integral de energia ($E = \int P \, dt$), cálculo do fator de carga e distinção formal entre maior potência média horária e demanda regulada de faturamento.
@@ -71,15 +74,17 @@ flowchart LR
     B --> C["Banco Relacional<br/>(SQLite database.py)"]
     C --> D["Cálculo Analítico<br/>(src/analysis.py)"]
     D --> E["Relatório Terminal<br/>(src/report.py)"]
-    D --> F["Arquivo Local<br/>(output/relatorio.csv)"]
+    D --> F["Arquivo CSV<br/>(output/relatorio.csv)"]
+    D --> G["Relatório Visual HTML<br/>(output/relatorio.html)"]
 ```
 
 ### Responsabilidade de Cada Módulo:
 - **`src/import_data.py`**: Valida a estrutura do CSV, verifica o contrato horário (`minute == 0`, `second == 0`), descarta duplicatas idênticas e identifica lacunas temporais no lote importado.
 - **`src/database.py`**: Gerencia a conexão SQLite, cria tabelas e persiste medições garantindo atomicidade com comparação estrita de valores numéricos.
 - **`src/analysis.py`**: Contém as funções matemáticas puras para cálculo de potência média, demanda máxima com desempate determinístico e agregações diárias.
-- **`src/report.py`**: Formata a exibição no terminal no padrão brasileiro (`1.234,56`), diferenciando novas inserções do histórico total acumulado.
-- **`main.py`**: Orquestra o fluxo de ponta a ponta, valida parâmetros globais (`INTERVALO_HORAS == 1.0`), audita lacunas em todo o histórico do banco e controla os códigos de saída do processo.
+- **`src/report.py`**: Formata a exibição no terminal no padrão brasileiro (`1.234,56`) e exporta o resumo tabular em CSV.
+- **`src/html_report.py`**: Gera o relatório visual em HTML estático e autocontido (gráficos Base64 de curva de carga, consumo diário e mapa de calor dia &times; horário, cards e tabela responsiva).
+- **`main.py`**: Orquestra o fluxo de ponta a ponta, valida parâmetros globais (`INTERVALO_HORAS`), audita lacunas em todo o histórico do banco e controla os códigos de saída do processo.
 
 > **Consultas SQL no Repositório:**  
 > O pipeline principal recupera o histórico ordenado via `SELECT data_hora, potencia_kw FROM medicoes ORDER BY data_hora ASC;` e processa as agregações com Pandas. As consultas analíticas completas mantidas em [`sql/queries.sql`](sql/queries.sql) funcionam como exemplos relacionais e são executadas automaticamente pelo teste `test_concordancia_sql_e_pandas_usando_arquivo_queries` para comprovar que SQL e Pandas chegam rigorosamente aos mesmos valores.
@@ -119,13 +124,21 @@ pip install -r requirements-dev.txt
 
 ### 4. Executar o pipeline
 ```bash
-# Execução padrão (utiliza configurações de config.py):
+# Execução padrão (gera terminal, output/relatorio.csv e output/relatorio.html):
 python main.py
 
-# Execução flexível via CLI (ex: dados em 15 min com tarifa customizada):
-python main.py --csv data/medicoes.csv --intervalo 0.25 --tarifa 0.80
+# Visualizar o relatório visual no navegador (arquivo estático 100% offline):
+# macOS:
+open output/relatorio.html
+# Linux:
+xdg-open output/relatorio.html
+# Windows:
+start output/relatorio.html
 
-# Exibir ajuda e opções de linha de comando:
+# Execução flexível via CLI (ex: dados em 15 min com tarifa customizada e origem declarada):
+python main.py --csv data/medicoes.csv --intervalo 0.25 --tarifa 0.80 --origem-dados simulados
+
+# Exibir ajuda e opções completas de linha de comando:
 python main.py --help
 ```
 
@@ -135,7 +148,7 @@ python main.py --help
 pytest -v --cov=src --cov=main --cov-report=term-missing
 ```
 
-### 6. Gerar a Curva de Carga (Opcional)
+### 6. Gerar a Curva de Carga Estática (Opcional)
 ```bash
 python scripts/gerar_curva_de_carga.py
 ```
@@ -147,7 +160,7 @@ O PowerMonitor inclui um estudo de caso com dados reais de telemetria residencia
 python scripts/preparar_estudo_caso_uci.py
 
 # 2. Executar o PowerMonitor sobre os dados reais (banco e saídas isolados):
-python main.py --csv data/medicoes_uci_2007_05.csv --banco database/estudo_caso.db --saida output/relatorio_estudo_caso.csv
+python main.py --csv data/medicoes_uci_2007_05.csv --banco database/estudo_caso.db --saida output/relatorio_estudo_caso.csv --html output/relatorio_estudo_caso.html --origem-dados reais
 
 # 3. Gerar os gráficos comparativos (salva em docs/images/):
 python scripts/analisar_estudo_caso_graficos.py
@@ -156,34 +169,36 @@ python scripts/analisar_estudo_caso_graficos.py
 ### Arquivos Gerados e Comportamento do Histórico:
 - **`database/power_monitor.db`**: Banco de dados SQLite persistente. Reexecuções com os mesmos dados mantêm o histórico inalterado (idempotência). Adicionar novas medições expande o histórico analisado.
 - **`output/relatorio.csv`**: Arquivo local sobrescrito a cada execução com o resumo diário consolidado (ignorado pelo Git para manter o repositório limpo).
+- **`output/relatorio.html`**: Relatório visual estático em arquivo único autocontido (gráficos embutidos em Base64, sem dependências de rede, responsivo e imprimível; ignorado pelo Git).
 
 ---
 
 ## 6. Premissas de Engenharia e Limitações
 
-### Potência (kW) vs. Energia (kWh)
-- **Potência ($P$, em kW):** Taxa instantânea ou média de demanda de energia elétrica durante o intervalo.
-- **Energia ($E$, em kWh):** Quantidade física consumida integrada no tempo ($E = \int P \, dt$, com $E = \sum P_i \times \Delta t$).
-- O PowerMonitor suporta intervalos amostrais regulares de 1 hora ($\Delta t = 1{,}0\text{ h}$), 30 minutos ($\Delta t = 0{,}5\text{ h}$) e 15 minutos ($\Delta t = 0{,}25\text{ h}$, padrão de concessionárias).
+### Potência Ativa (kW) vs. Energia Ativa (kWh)
+- **Potência Ativa ($P$, em kW):** Cada registro da série temporal representa a potência ativa média demandada durante o intervalo amostral $\Delta t$, e não uma medição pontual ou snapshot instantâneo.
+- **Energia Ativa ($E$, em kWh):** Quantidade física consumida integrada no tempo ($E = \int P \, dt$). No PowerMonitor, a conversão física é calculada diretamente como $E = \sum P_i \times \Delta t$ ($1\text{ kW} \times 1\text{ h} = 1\text{ kWh}$).
+- O PowerMonitor suporta intervalos amostrais regulares de 1 hora ($\Delta t = 1{,}0\text{ h}$), 30 minutos ($\Delta t = 0{,}5\text{ h}$) e 15 minutos ($\Delta t = 0{,}25\text{ h}$).
 
 ### Contrato Temporal, Lacunas e Dias Incompletos
 - **Contrato Temporal:** Cada timestamp indica o início de um intervalo alinhado à grade amostral (`:00` para 1h; `:00` e `:30` para 30 min; `:00`, `:15`, `:30` e `:45` para 15 min). Frações de segundo são rejeitadas sem normalização silenciosa.
-- **Potência Negativa:** Valores com $P < 0$ não representam impossibilidade física na natureza (podem decorrer de geração fotovoltaica ou injeção em rede bidirecional), mas estão **fora do escopo de consumo unidirecional do PowerMonitor**, sendo descartados na validação.
+- **Potência Negativa:** Valores com $P < 0$ não representam impossibilidade física na natureza (podem decorrer de geração própria fotovoltaica ou injeção em rede bidirecional), mas estão **fora do escopo de consumo unidirecional do PowerMonitor**, sendo descartados na validação.
 - **Lacunas no Histórico:** O sistema audita medições ausentes no CSV e no banco e emite avisos explícitos, **sem preenchimento artificial por zero nem interpolações**.
 - **Dias Incompletos:** Dias com amostragem incompleta (ex: menos de 24 medições para 1h ou menos de 96 para 15 min) são sinalizados como parciais no relatório, somando estritamente os intervalos registrados.
 
-### Fator de Carga vs. Eficiência Energética
-- O fator de carga reportado ($51{,}94\%$) é a razão entre a potência média ($14{,}44\text{ kW}$) e o pico ($27{,}80\text{ kW}$).
-- Ele quantifica a **uniformidade da solicitação de carga no tempo**, não a eficiência física ou rendimento dos equipamentos instalados.
+### Fator de Carga vs. Fator de Potência e Eficiência
+- O fator de carga reportado ($51{,}94\%$) é a razão entre a potência média ($14{,}44\text{ kW}$) e o pico ($27{,}80\text{ kW}$), conforme a definição da REN ANEEL nº 1.000/2021 (Art. 2º, XIX).
+- Ele quantifica a **uniformidade da solicitação de carga no tempo**, dependendo da resolução amostral e cobertura temporal. Em caso de lacunas, sua interpretação restringe-se estritamente aos intervalos medidos.
+- **Não deve ser confundido com o fator de potência** ($\cos \varphi$, Art. 302, relação entre potência ativa kW e aparente kVA, com limite regulatório de 0,92) nem com o rendimento ou eficiência energética dos equipamentos.
 
-### Demanda de Pico vs. Demanda de Faturamento
-- O pico de **27,80 kW** reportado refere-se à **maior potência média observada** no período.
-- No faturamento regulado de energia elétrica (concessionárias), a demanda faturável utiliza janelas integradas de 15 minutos e regras contratuais específicas. Com a flag `--intervalo 0.25`, o PowerMonitor agora processa medições nativas nessa resolução de 15 minutos.
-- A presença de um pico às 18:00 sugere investigar quais equipamentos ou processos foram acionados no horário, sem inferir desperdício ou falha sem dados setoriais complementares.
+### Demanda de Pico vs. Demanda Regulada de Faturamento
+- O pico de **27,80 kW** reportado refere-se à **maior potência média observada** no passo amostral dos dados ($\Delta t$).
+- Não equivale à demanda contratada nem à demanda medida regulatória de faturamento (Art. 2º, XIII: integrada em blocos de 15 minutos ao longo de todo o ciclo mensal contínuo). O suporte do PowerMonitor a 15 minutos é uma capacidade analítica de resolução amostral, e não uma conformidade homologada de faturamento.
+- A presença de um pico sugere investigar operacionalmente quais cargas foram acionadas no horário, sem inferir desperdício ou falha sem medições de campo adicionais.
 
-### Estimativa Financeira Didática
-- O custo reportado (R$ 1.819,50 a R$ 0,75/kWh) é uma estimativa proporcional didática ($E \times \text{tarifa}$).
-- Não equivale a uma fatura de energia, pois não inclui demandas contratadas, postos horosazonais (ponta / fora de ponta), bandeiras tarifárias ou tributos (ICMS/PIS/COFINS).
+### Estimativa de Custo Didática vs. Faturamento de Concessionária
+- O custo reportado (R$ 1.819,50 a R$ 0,75/kWh) é uma estimativa linear simples e didática ($E \times \text{tarifa}$).
+- **Não constitui fatura de energia nem substitui faturamento de concessionária**, pois não inclui componentes regulados da REN 1.000/2021 como: demanda faturável em R$/kW (Grupo A, Art. 294), custo de disponibilidade (Grupo B, Arts. 290 e 291), faixas horárias da Tarifa Branca (Art. 212), adicionais de bandeiras tarifárias ou tributos (ICMS, PIS, COFINS).
 
 ---
 
@@ -192,7 +207,7 @@ python scripts/analisar_estudo_caso_graficos.py
 | Melhoria Proposta | Limitação que Resolve |
 |---|---|
 | **Ingestão via API REST** | Substitui a dependência exclusiva de arquivos CSV locais por coleta automatizada de medidores IoT. |
-| **Simulação Tarifária Horossazonal (Posto Ponta / Fora Ponta)** | Diferenciação de tarifas por faixa horária de acordo com a estrutura tarifária horária regulada (ex: Tarifa Branca / Grupo A). |
+| **Simulação Tarifária Horossazonal (Posto Ponta / Fora Ponta)** | Simulação didática de faixas horárias inspiradas na estrutura de Tarifa Branca para baixa tensão (Art. 212, com diferenciação em R$/kWh) ou binômia para média/alta tensão (Art. 294, com demanda em R$/kW e consumo em R$/kWh). |
 
 ---
 

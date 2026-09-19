@@ -36,6 +36,17 @@ Este documento detalha o dicionário de dados, as grandezas físicas, o contrato
 | `tarifa_aplicada_r_kwh`| Numérico (`float`) | R$/kWh | Tarifa fixa de referência utilizada para simulação financeira. |
 | `custo_estimado_dia_r` | Numérico (`float`) | R$ | Estimativa linear de custo do dia ($E_{\text{dia}} \times \text{tarifa}$). |
 
+### 1.4 Relatório Visual HTML Autocontido (`output/relatorio.html`)
+*(Arquivo local estático gerado após a execução, listado no `.gitignore` para não ser versionado).*
+
+O relatório visual é um arquivo HTML5 estático único, gerado offline sem dependências de rede (sem CDNs, fontes remotas ou bibliotecas externas), estruturado nas seguintes seções:
+- **Cabeçalho:** Identificação do PowerMonitor, escopo temporal com significado dos limites, resolução amostral, carimbo de geração com fuso local e badge de origem dos dados.
+- **Cards de Indicadores:** 6 cartões de destaque com métricas consolidadas e notas conceituais.
+- **Gráficos Integrados em Base64:** Curva de carga (com corte em lacunas), barras diárias (com segregação de dias parciais) e mapa de calor dia &times; horário (com destaque de dados ausentes e potência zero).
+- **Auditoria de Qualidade:** Balanço lote CSV vs histórico SQLite e alertas de consistência.
+- **Síntese e Limitações Regulatórias:** Parágrafos interpretativos acompanhados da nota de delimitação legal.
+- **Tabela Diária Responsiva:** Tabela acessível com rolagem horizontal isolada e padrão numérico brasileiro.
+
 ---
 
 ## 2. Grandezas Físicas e Unidades
@@ -116,7 +127,7 @@ O Fator de Carga é a razão entre a potência média e a demanda máxima regist
 
 $$FC = \frac{\bar{P}}{P_{\text{máx}}} \times 100\%$$
 
-*Interpretação de Engenharia:* O fator de carga é um indicador do **grau de uniformidade da solicitação de potência** frente à capacidade de pico instalada. Valores elevados indicam carga distribuída de maneira uniforme, enquanto valores baixos indicam concentração de consumo em horários específicos. **O fator de carga não representa nem deve ser confundido com a eficiência energética dos equipamentos**. Se a demanda máxima for nula ($P_{\text{máx}} = 0$), o indicador é definido como não aplicável, evitando divisões por zero. Em períodos com lacunas, refere-se estritamente às horas disponíveis.
+*Interpretação de Engenharia e Regulatória:* Definido na REN ANEEL nº 1.000/2021 (Art. 2º, XIX) como a razão entre a demanda média e a demanda máxima em um intervalo de tempo, o fator de carga expressa o **grau de uniformidade da solicitação de potência** frente ao pico de demanda observado. Valores elevados indicam carga distribuída de maneira uniforme no tempo, enquanto valores baixos indicam concentração de consumo em horários específicos. **O fator de carga não representa nem deve ser confundido com o fator de potência ($\cos \varphi$, Art. 302) nem com a eficiência energética dos equipamentos**. Se a demanda máxima for nula ($P_{\text{máx}} = 0$), o indicador é definido como não aplicável, evitando divisões por zero. Em períodos com lacunas, refere-se estritamente aos intervalos medidos.
 
 ### 4.6 Dia de Maior Consumo Registrado
 Identifica a data civil em que ocorreu o maior valor de $E_{\text{dia}}$. Em caso de empate, seleciona-se a data mais antiga (`dia ASC`). Quando o dia selecionado for parcial, o relatório explicita que a comparação frente a dias completos é limitada pela diferença de cobertura amostral.
@@ -135,20 +146,66 @@ Multiplicação linear didática:
 
 $$\text{Custo (R\$)} = E_{\text{total}} \, (\text{kWh}) \times \text{Tarifa} \, (\text{R\$/kWh})$$
 
-*Distinção regulatória:* Esta estimativa não substitui nem equivale a uma fatura de concessionária de distribuição, pois não modela demandas contratadas, postos tarifários horossazonais (ponta e fora de ponta), bandeiras tarifárias nem encargos setoriais e tributos (ICMS, PIS, COFINS).
+*Distinção regulatória:* Esta estimativa constitui uma simulação linear para fins puramente educacionais e analíticos. Não substitui nem equivale a uma fatura de concessionária de distribuição, conforme detalhado na Seção 6.
 
 ---
 
-## 5. Visualização: Curva de Carga Semanal
+## 5. Visualização de Dados e Relatório Gráfico
 
-O gráfico da curva de carga do arquivo de exemplo [`data/medicoes.csv`](../data/medicoes.csv) está salvo em [`docs/images/curva_de_carga.png`](images/curva_de_carga.png):
+### 5.1 Relatório Visual Autocontido (`output/relatorio.html`)
+O pipeline compila automaticamente um relatório visual estático completo e interativo via navegador em `output/relatorio.html`.
+Principais premissas das visualizações:
+- **Curva de Carga no Tempo:** A linha plota a potência ativa média no intervalo amostral. Em caso de lacunas temporais (dados ausentes), a grade temporal teórica é reindexada com `NaN`, **interrompendo a linha nos períodos sem medição** para não induzir presunção de registros inexistentes.
+- **Consumo Diário:** Gráfico de barras ordenado cronologicamente, com diferenciação visual e textual entre dias completos (24h OK) e dias parciais (< 24h), além de destaque ao dia de maior consumo e anotações de participação percentual.
+- **Mapa de Calor Operacional (Dia &times; Horário):** Matriz 2D onde cada célula representa um intervalo amostral. Intervalos ausentes são preenchidos com cinza neutro (`#e2e8f0`) com legenda dedicada, enquanto potências de zero quilowatt ($0\text{ kW}$) válidas são mapeadas em tom claro da escala (`#ffffcc`), evitando confusão entre ausência de dado e consumo nulo.
+- **Sem Dependências de Rede:** Todas as figuras são geradas via Matplotlib (`backend Agg`) e embutidas diretamente no HTML como imagens Base64 (`data:image/png;base64,...`), viabilizando inspeção offline, compartilhamento por e-mail e preservação total de leiaute.
+
+### 5.2 Curva de Carga Estática para Documentação (`docs/images/curva_de_carga.png`)
+O gráfico da curva de carga do arquivo de exemplo de 7 dias [`data/medicoes.csv`](../data/medicoes.csv) está salvo como asset estático em [`docs/images/curva_de_carga.png`](images/curva_de_carga.png):
 
 ![Curva de Carga Horária Semanal](images/curva_de_carga.png)
 
-### Como reproduzir o gráfico:
-Para gerar novamente a imagem a partir do arquivo CSV atual, execute o script dedicado:
+#### Como reproduzir o gráfico avulso:
+Para gerar novamente a imagem estática a partir do arquivo CSV de exemplo, execute o script dedicado:
 
 ```bash
 python scripts/gerar_curva_de_carga.py
 ```
 O script lê `data/medicoes.csv` e regrava `docs/images/curva_de_carga.png` com título, eixos, unidades e identificação de dados simulados.
+
+---
+
+## 6. Enquadramento Conceitual e Escopo Regulatório (REN ANEEL nº 1.000/2021)
+
+### 6.1 Finalidade Educacional e Limites do Projeto
+O **PowerMonitor** é uma aplicação voltada ao ensino de engenharia de dados aplicada ao setor elétrico. Tem por finalidade receber séries de telemetria, validar regras físicas e temporais, estruturar dados em SQL e calcular grandezas fundamentais de consumo e perfil de carga.
+
+> [!IMPORTANT]
+> O PowerMonitor **não é um sistema de tarifação ou faturamento comercial regulado**. O software não realiza cobranças legais, não emite faturas, não possui homologação perante a ANEEL ou o INMETRO e não valida conformidade regulatória de distribuidoras ou consumidores.
+
+### 6.2 Conceitos Alinhados à REN ANEEL nº 1.000/2021
+As definições adotadas na ferramenta guardam correspondência direta com os conceitos metrológicos e regulatórios estabelecidos na Resolução Normativa ANEEL nº 1.000/2021:
+
+- **Demanda (Art. 2º, XI)**: Média da potência ativa solicitada à rede pela instalação elétrica ao longo de um intervalo de tempo especificado ($\Delta t$), expressa em quilowatts (kW).
+- **Demanda Medida vs. Pico Observado (Art. 2º, XIII)**:
+  - *Na regulação:* A "demanda medida" é a maior potência ativa integrada em intervalos contínuos de 15 minutos durante o ciclo mensal de faturamento.
+  - *No PowerMonitor:* O software apura a maior potência média observada no passo amostral dos dados ($\Delta t = 1{,}0\text{ h}$, $30\text{ min}$ ou $15\text{ min}$). Embora o pipeline suporte dados com resolução de 15 minutos, essa capacidade analítica representa uma funcionalidade de amostragem temporal, e não uma conformidade homologada com os procedimentos de integração mensal de demanda faturável.
+- **Energia Elétrica Ativa (Art. 2º, XVI)**: Integral da potência ativa demandada ao longo do tempo, convertível em trabalho útil, expressa em quilowatts-hora (kWh). Cada linha da série temporal representa a potência média durante o intervalo $\Delta t$, e a multiplicação direta $E_i = P_i \times \Delta t$ reflete a conversão física exata de energia no período.
+- **Fator de Carga (Art. 2º, XIX)**: Razão entre a demanda média ($\bar{P}$) e a demanda máxima registrada ($P_{\text{máx}}$) no período monitorado. O indicador expressa a taxa de modulação e o aproveitamento do perfil de carga, dependendo estritamente da cobertura e resolução da medição.
+- **Modalidades Tarifárias e Tarifa Branca (Art. 212)**:
+  - No faturamento regulado, a *Tarifa Branca* aplica-se a unidades consumidoras do **Grupo B** (baixa tensão) e diferencia **exclusivamente os valores de tarifa de consumo de energia elétrica ativa (R$/kWh)** segundo os postos tarifários (ponta, intermediário e fora de ponta). No Grupo B, **não há cobrança de demanda faturável em R$/kW**.
+  - O faturamento binômio com contratação e medição obrigatória de demanda em R$/kW é privativo do **Grupo A** (alta/média tensão, Art. 294), não devendo ser confundido com a estrutura da Tarifa Branca.
+
+### 6.3 Componentes de Faturamento Excluídos do Escopo
+Em conformidade com a natureza didática da ferramenta, os seguintes mecanismos regulados de faturamento da REN 1.000/2021 **não são implementados nem calculados**:
+
+1. **Faturamento de Demanda e Ultrapassagem (Arts. 294, 295 e 301)**: Não há modelagem de demanda contratada, tolerâncias de 5% nem tarifas de ultrapassagem em R$/kW para o Grupo A.
+2. **Custo de Disponibilidade (Arts. 290 e 291)**: Não há cobrança do consumo mínimo aplicável ao Grupo B por tipo de conexão (monofásica 30 kWh, bifásica 50 kWh ou trifásica 100 kWh).
+3. **Energia Reativa e Fator de Potência (Arts. 302 a 304)**: O PowerMonitor analisa exclusivamente grandezas ativas (kW e kWh). Não há registros de energia reativa (kvarh), cálculo de fator de potência indutivo/capacitivo ($\cos \varphi$) nem apuração de encargos por reativos excedentes frente ao limite regulatório de 0,92.
+4. **Postos Horários e Sazonalidade**: A tarifa do PowerMonitor é tratada como um parâmetro monômio linear constante, sem diferenciação horária (ponta, intermediária, fora de ponta) ou sazonal (seca/úmida).
+5. **Bandeiras Tarifárias e Tributos**: Não são simulados os adicionais de bandeiras tarifárias (verde, amarela, vermelha P1/P2 ou escassez hídrica) nem os tributos incidentes na fatura (ICMS, PIS, COFINS e CIP/COSIP).
+6. **Compensação de Geração Distribuída**: Não há contabilização de créditos de micro ou minigeração distribuída (Lei nº 14.300/2022).
+
+### 6.4 Documento de Referência
+- **Resolução Normativa ANEEL nº 1.000, de 7 de dezembro de 2021**, que estabelece as Regras de Prestação do Serviço Público de Distribuição de Energia Elétrica.
+- **Fonte documental utilizada:** Reprodução disponibilizada pelo portal *Leis.org* (`www.leis.org`), com carimbo de impressão em 19/09/2026. A indicação dessa data expressa estritamente o registro de extração do documento de consulta, recomendando-se conferência das resoluções homologatórias e atos posteriores no Diário Oficial da União e no acervo oficial da ANEEL para quaisquer aplicações regulatórias formais.
