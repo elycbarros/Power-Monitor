@@ -12,7 +12,8 @@ O formato é baseado no padrão [Keep a Changelog](https://keepachangelog.com/pt
   - Flag `--intervalo` no CLI (`0.25` para 15 min, `0.5` para 30 min e `1.0` para 1h).
   - Validação de alinhamento à grade amostral (`:00`, `:15`, `:30`, `:45` para 15 min) rejeitando minutos fora da grade.
   - Auditoria de lacunas temporais com suporte à frequência de 15 minutos no CSV e no banco.
-  - Suíte expandida para **30 testes automatizados** com teste E2E dedicado de 15 minutos (96 medições diárias com integral exata de 240,0 kWh).
+  - Suíte expandida para **36 testes automatizados** (+6 testes diretos em `import_data.py`: arquivos vazios, cabeçalhos sem linhas, colunas ausentes, formato ISO com `T`, espaços em branco e potências `0.0` kW).
+  - Cobertura de testes em `src/import_data.py` elevada para **91%**, alcançando **89%** no projeto consolidado.
 
 ---
 

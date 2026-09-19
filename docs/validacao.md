@@ -77,6 +77,12 @@ A suíte conta com **28 testes automatizados** cobrindo unidades de cálculo el�
 | 28 | `test_pipeline_deteccao_lacunas_em_importacoes_distintas` | [`main.py`](../main.py) | Garante que o pipeline emite alertas claros no terminal quando lotes separados geram lacunas no histórico consolidado. |
 | 29 | `test_pipeline_e2e_com_banco_temporario_e_retorno_falhas` | [`main.py`](../main.py) | Teste ponta a ponta: retorno `0` em sucesso, e retorno `1` em CSV sem dados válidos, falha de exportação ou erro na criação do banco. |
 | 30 | `test_cli_argumentos_e_execucao_customizada` | [`main.py`](../main.py) | Validação das opções de CLI com `argparse` (`--csv`, `--tarifa`, `--banco`, `--saida`, `--intervalo`) e execução do pipeline com parâmetros customizados. |
+| 31 | `test_load_and_validate_csv_arquivo_inexistente_ou_vazio` | [`src/import_data.py`](../src/import_data.py) | Lançamento de `FileNotFoundError` para caminho inexistente e `ValueError` para arquivo com 0 bytes. |
+| 32 | `test_load_and_validate_csv_estrutura_colunas_ausentes` | [`src/import_data.py`](../src/import_data.py) | Rejeição explícita com `ValueError` detalhando colunas obrigatórias ausentes. |
+| 33 | `test_load_and_validate_csv_apenas_cabecalho` | [`src/import_data.py`](../src/import_data.py) | Retorno seguro de DataFrame vazio com colunas preservadas e aviso de ausência de dados quando há apenas cabeçalhos. |
+| 34 | `test_load_and_validate_csv_sem_linhas_validas` | [`src/import_data.py`](../src/import_data.py) | Contabilidade estrita quando 100% das linhas lidas são inválidas (`linhas_descartadas == total_lidos`). |
+| 35 | `test_load_and_validate_csv_formato_iso_t_espacos_e_potencia_zero` | [`src/import_data.py`](../src/import_data.py) | Suporte a timestamps no formato ISO com 'T', remoção de espaços em branco e aceitação de potências `0.0 kW` (instalação sem carga). |
+| 36 | `test_identificar_lacunas_e_resumo_casos_borda` | [`src/import_data.py`](../src/import_data.py) | Casos de borda em lacunas: DataFrames com menos de 2 linhas, listas vazias e sufixo resumido para mais de 3 dias inteiros ausentes. |
 
 ---
 
@@ -95,14 +101,14 @@ pytest -v --cov=src --cov=main --cov-report=term-missing
 | [`src/__init__.py`](../src/__init__.py) | 1 | 0 | **100%** | Inicialização do pacote |
 | [`src/analysis.py`](../src/analysis.py) | 157 | 9 | **94%** | Motor de cálculo elétrico e síntese |
 | [`src/report.py`](../src/report.py) | 124 | 10 | **92%** | Apresentação no terminal e CSV |
-| [`src/import_data.py`](../src/import_data.py) | 140 | 19 | **86%** | Ingestão, validação temporal sub-horária e lacunas |
+| [`src/import_data.py`](../src/import_data.py) | 140 | 12 | **91%** | Ingestão, validação temporal sub-horária e lacunas |
 | [`src/database.py`](../src/database.py) | 59 | 9 | **85%** | Persistência transacional e SQLite |
 | [`main.py`](../main.py) | 110 | 25 | **77%** | Orquestração do pipeline e CLI |
-| **TOTAL CONSOLIDADO** | **591** | **72** | **88%** | **Suíte completa** |
+| **TOTAL CONSOLIDADO** | **591** | **65** | **89%** | **Suíte completa** |
 
 Resultado da suíte:
 ```text
-============================== 30 passed in 0.62s ==============================
+============================== 36 passed in 0.42s ==============================
 ```
 
 ### Tolerâncias Numéricas Utilizadas nas Comparações SQL vs. Pandas

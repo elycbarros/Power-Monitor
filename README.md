@@ -1,7 +1,7 @@
 # PowerMonitor: Análise de Consumo e Demanda de Energia Elétrica
 
 [![CI - Testes e Qualidade](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml)
-[![Cobertura de Testes](https://img.shields.io/badge/cobertura-88%25-brightgreen.svg)](#5-executar-os-testes-automatizados-e-cobertura)
+[![Cobertura de Testes](https://img.shields.io/badge/cobertura-89%25-brightgreen.svg)](#5-executar-os-testes-automatizados-e-cobertura)
 
 O **PowerMonitor** é um projeto de portfólio desenvolvido para demonstrar a aplicação integrada de análise de dados, persistência relacional e conceitos práticos de Engenharia Elétrica na avaliação de séries temporais de consumo e demanda de energia.
 

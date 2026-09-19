@@ -885,3 +885,116 @@ def test_cli_argumentos_e_execucao_customizada(tmp_path):
     assert custom_db.exists()
     assert custom_out.exists()
 
+
+# ----------------------------------------------------------------------
+# 6. Testes Diretos de Ingestão e Validação (import_data.py)
+# ----------------------------------------------------------------------
+
+
+def test_load_and_validate_csv_arquivo_inexistente_ou_vazio(tmp_path):
+    """Verifica lançamento de FileNotFoundError para arquivo inexistente
+
+    e ValueError para arquivo de tamanho zero.
+    """
+    # 1. Arquivo inexistente
+    arquivo_inexistente = tmp_path / "nao_existe.csv"
+    with pytest.raises(FileNotFoundError, match="Arquivo de medições não encontrado"):
+        load_and_validate_csv(arquivo_inexistente)
+
+    # 2. Arquivo vazio (0 bytes)
+    arquivo_vazio = tmp_path / "vazio_zero_bytes.csv"
+    arquivo_vazio.write_text("", encoding="utf-8")
+    with pytest.raises(ValueError, match="O arquivo CSV está vazio"):
+        load_and_validate_csv(arquivo_vazio)
+
+
+def test_load_and_validate_csv_estrutura_colunas_ausentes(tmp_path):
+    """Verifica erro explicito quando colunas obrigatórias estão ausentes no CSV."""
+    # Coluna potencia_kw ausente
+    csv_sem_potencia = tmp_path / "sem_potencia.csv"
+    csv_sem_potencia.write_text("data_hora,outra_coluna\n2026-08-01 08:00,10.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Colunas ausentes"):
+        load_and_validate_csv(csv_sem_potencia)
+
+    # Cabeçalho completamente errado
+    csv_errado = tmp_path / "cabecalho_errado.csv"
+    csv_errado.write_text("timestamp,valor\n2026-08-01 08:00,10.0\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Colunas esperadas"):
+        load_and_validate_csv(csv_errado)
+
+
+def test_load_and_validate_csv_apenas_cabecalho(tmp_path):
+    """Verifica comportamento quando o CSV contém cabeçalhos válidos mas nenhuma linha de dados."""
+    csv_so_cabecalho = tmp_path / "apenas_cabecalho.csv"
+    csv_so_cabecalho.write_text("data_hora,potencia_kw\n", encoding="utf-8")
+
+    df_valid, relatorio = load_and_validate_csv(csv_so_cabecalho)
+    assert df_valid.empty
+    assert list(df_valid.columns) == ["data_hora", "potencia_kw"]
+    assert relatorio["total_lidos"] == 0
+    assert relatorio["registros_validos"] == 0
+    assert any("apenas cabeçalhos" in a for a in relatorio["avisos"])
+
+
+def test_load_and_validate_csv_sem_linhas_validas(tmp_path):
+    """Verifica que quando 100% das linhas lidas são inválidas, todas são contabilizadas
+
+    como descartadas e um DataFrame vazio estruturado é retornado.
+    """
+    csv_todas_invalidas = tmp_path / "todas_invalidas.csv"
+    conteudo = (
+        "data_hora,potencia_kw\n"
+        ",10.0\n"                     # data nula
+        "2026-08-01 08:00,\n"         # potencia nula
+        "2026-08-01 08:00,-15.0\n"    # potencia negativa
+    )
+    csv_todas_invalidas.write_text(conteudo, encoding="utf-8")
+
+    df_valid, relatorio = load_and_validate_csv(csv_todas_invalidas)
+    assert df_valid.empty
+    assert relatorio["total_lidos"] == 3
+    assert relatorio["registros_validos"] == 0
+    assert relatorio["linhas_descartadas"] == 3
+    assert relatorio["ausentes_descartados"] == 2
+    assert relatorio["negativos_rejeitados"] == 1
+
+
+def test_load_and_validate_csv_formato_iso_t_espacos_e_potencia_zero(tmp_path):
+    """Verifica que formato ISO com 'T', espaços em branco extras em campos
+
+    e potências exatamente zero (0.0 kW, instalação sem carga) são aceitos com sucesso.
+    """
+    csv_teste = tmp_path / "iso_espacos_zero.csv"
+    conteudo = (
+        "data_hora,potencia_kw\n"
+        "2026-08-01T08:00,10.5\n"           # Formato ISO com 'T'
+        "  2026-08-01 09:00  ,  15.0  \n"   # Espaços externos a serem limpos com strip
+        "2026-08-01 10:00,0.0\n"            # Potência zero (válida fisicamente)
+    )
+    csv_teste.write_text(conteudo, encoding="utf-8")
+
+    df_valid, relatorio = load_and_validate_csv(csv_teste)
+    assert len(df_valid) == 3
+    assert relatorio["total_lidos"] == 3
+    assert relatorio["registros_validos"] == 3
+    assert relatorio["linhas_descartadas"] == 0
+    assert df_valid["potencia_kw"].iloc[2] == 0.0
+
+
+def test_identificar_lacunas_e_resumo_casos_borda():
+    """Testa casos de borda das funções de identificação e resumo de lacunas temporais."""
+    # 1. Menos de 2 medições -> sem lacunas calculáveis
+    assert identificar_lacunas_temporais(pd.DataFrame()) == []
+    df_1linha = pd.DataFrame({"data_hora": [pd.Timestamp("2026-08-01 08:00")]})
+    assert identificar_lacunas_temporais(df_1linha) == []
+
+    # 2. Resumo de lacunas vazias
+    assert formatar_resumo_lacunas([]) == []
+
+    # 3. Resumo de lacunas com mais de 3 dias inteiramente ausentes (testa sufixo 'e mais X dia(s)')
+    # Gera 4 dias inteiros (4 * 24 = 96 horas) ausentes
+    lacunas_4dias = pd.date_range("2026-08-01 00:00", "2026-08-04 23:00", freq="1h")
+    resumo_4dias = formatar_resumo_lacunas(list(lacunas_4dias), intervalo_horas=1.0)
+    assert any("e mais 1 dia(s)" in msg for msg in resumo_4dias)
+
+
