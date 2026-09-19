@@ -307,24 +307,51 @@ def test_rejeicao_potencia_infinita(tmp_path):
 def test_estatisticas_validacao_mutuamente_exclusivas(tmp_path):
     """Garante que a contagem de linhas é estrita e mutuamente exclusiva,
 
-    evitando contar a mesma linha duas vezes quando data e potência são inválidas.
+    evitando contar a mesma linha duas vezes quando data e potência são inválidas,
+    e comprovando a identidade contábil:
+    total_lidos == registros_validos + linhas_descartadas, onde
+    linhas_descartadas == soma exata de todas as categorias individuais de descarte.
     """
     csv_content = (
         "data_hora,potencia_kw\n"
-        "2026-08-01 08:00,10.0\n"         # Válida
-        "data_invalida,invalida\n"        # Inválida em ambos (deve ser contada 1 vez)
-        "2026-08-01 10:00,\n"             # Ausente
-        "2026-08-01 11:00,15.0\n"         # Válida
+        "2026-08-01 08:00,10.0\n"         # Válida (1)
+        "data_invalida,invalida\n"        # Data inválida (1)
+        "2026-08-01 10:00,\n"             # Ausente/nulo (1)
+        "2026-08-01 11:00,15.0\n"         # Válida (2)
+        "2026-08-01 11:00,15.0\n"         # Duplicada idêntica (1)
+        "2026-08-01 12:00,-5.0\n"         # Negativo (1)
+        "2026-08-01 13:00,inf\n"          # Potência infinita/não numérica (1)
+        "2026-08-01 14:15,20.0\n"         # Fora de contrato horário (1)
     )
     temp_csv = tmp_path / "teste_estatisticas.csv"
     temp_csv.write_text(csv_content, encoding="utf-8")
 
     df_valid, relatorio = load_and_validate_csv(temp_csv)
 
-    assert relatorio["total_lidos"] == 4
+    # Verificação das categorias individuais
+    assert relatorio["ausentes_descartados"] == 1
+    assert relatorio["data_invalida"] == 1
+    assert relatorio["fora_contrato_horario"] == 1
+    assert relatorio["potencia_nao_numerica_ou_infinita"] == 1
+    assert relatorio["negativos_rejeitados"] == 1
+    assert relatorio["duplicados_exatos_descartados"] == 1
+
+    soma_categorias = (
+        relatorio["ausentes_descartados"]
+        + relatorio["data_invalida"]
+        + relatorio["fora_contrato_horario"]
+        + relatorio["potencia_nao_numerica_ou_infinita"]
+        + relatorio["negativos_rejeitados"]
+        + relatorio["duplicados_exatos_descartados"]
+    )
+
+    # Identidades contábeis auditáveis
+    assert relatorio["total_lidos"] == 8
     assert relatorio["registros_validos"] == 2
-    assert relatorio["linhas_descartadas"] == 2
+    assert relatorio["linhas_descartadas"] == 6
+    assert relatorio["linhas_descartadas"] == soma_categorias
     assert relatorio["total_lidos"] == relatorio["registros_validos"] + relatorio["linhas_descartadas"]
+    assert len(df_valid) == relatorio["registros_validos"]
 
 
 def test_contrato_temporal_minutos_fracionados(tmp_path):
