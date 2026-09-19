@@ -270,6 +270,10 @@ def gerar_indicadores_completos(
                 "horas_ausentes": 0,
                 "percentual_cobertura": None,
             },
+            "df_diario": pd.DataFrame(
+                columns=["dia", "total_medicoes", "potencia_media_kw", "demanda_maxima_kw",
+                         "consumo_kwh", "participacao_percentual", "dia_completo"]
+            ),
         }
 
     df_sorted = df.copy()
@@ -310,6 +314,8 @@ def gerar_indicadores_completos(
         "consumo_maior_dia_kwh": consumo_dia_max,
         "dia_maior_consumo_completo": dia_max_completo,
         "cobertura": cobertura,
+        # df_diario já calculado internamente; exposto para evitar recálculo no pipeline
+        "df_diario": df_diario,
     }
 
 

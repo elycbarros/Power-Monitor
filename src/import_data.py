@@ -221,7 +221,16 @@ def load_and_validate_csv(
         )
 
     relatorio["registros_validos"] = len(df_valid)
-    relatorio["linhas_descartadas"] = total_lidos - relatorio["registros_validos"]
+    # Calculado como soma das categorias para garantir consistência com os contadores individuais:
+    # total_lidos == registros_validos + linhas_descartadas (identidade auditável)
+    relatorio["linhas_descartadas"] = (
+        relatorio["ausentes_descartados"]
+        + relatorio["data_invalida"]
+        + relatorio["fora_contrato_horario"]
+        + relatorio["potencia_nao_numerica_ou_infinita"]
+        + relatorio["negativos_rejeitados"]
+        + relatorio["duplicados_exatos_descartados"]
+    )
 
     if relatorio["ausentes_descartados"] > 0:
         relatorio["avisos"].append(f"{relatorio['ausentes_descartados']} linha(s) com campos nulos/vazios descartadas.")

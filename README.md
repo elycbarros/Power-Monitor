@@ -162,13 +162,12 @@ python scripts/gerar_curva_de_carga.py
 
 ---
 
-## 7. Próximos Passos Priorizados (v2.0)
+## 7. Próximos Passos (v2.0)
 
-| Melhoria Proposta | Limitação que Resolve | Status |
-|---|---|---|
-| **Cálculo do Fator de Carga e Participação Diária** | Permite avaliar a uniformidade da curva de carga e a contribuição percentual de cada dia. | **Concluído na v1.0** |
-| **Suporte a Intervalos de 15 Minutos** | Permite analisar dados na mesma resolução adotada por medidores industriais e concessionárias. | Planejado |
-| **Ingestão via API REST** | Substitui a dependência exclusiva de arquivos CSV locais por coleta automatizada de medidores IoT. | Planejado |
+| Melhoria Proposta | Limitação que Resolve |
+|---|---|
+| **Suporte a Intervalos de 15 Minutos** | Permite analisar dados na mesma resolução adotada por medidores industriais e concessionárias. |
+| **Ingestão via API REST** | Substitui a dependência exclusiva de arquivos CSV locais por coleta automatizada de medidores IoT. |
 
 ---
 

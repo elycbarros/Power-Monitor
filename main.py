@@ -17,7 +17,7 @@ if str(BASE_DIR) not in sys.path:
 import config
 from src.database import get_connection, create_tables, insert_medicoes, query_to_dataframe
 from src.import_data import load_and_validate_csv, identificar_lacunas_temporais, formatar_resumo_lacunas
-from src.analysis import gerar_indicadores_completos, calcular_consumo_diario
+from src.analysis import gerar_indicadores_completos
 from src.report import exibir_relatorio_terminal, exportar_relatorio_csv
 
 
@@ -125,10 +125,8 @@ def executar_pipeline() -> int:
                 intervalo_horas=config.INTERVALO_HORAS,
             )
 
-            df_diario = calcular_consumo_diario(
-                df=df_db,
-                intervalo_horas=config.INTERVALO_HORAS,
-            )
+            # df_diario já calculado dentro de gerar_indicadores_completos
+            df_diario = indicadores["df_diario"]
         except Exception as e:
             print(f"\n[ERRO] Falha durante o cálculo de indicadores: {e}")
             return 1
