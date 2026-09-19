@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Dict, Any, Union, Optional, List
 import pandas as pd
+from src.analysis import IndicadoresCompletosDict
 
 
 def formatar_numero_br(valor: float, casas_decimais: int = 2) -> str:
@@ -13,7 +14,7 @@ def formatar_numero_br(valor: float, casas_decimais: int = 2) -> str:
 
 
 def exibir_relatorio_terminal(
-    indicadores: Dict[str, Any],
+    indicadores: Union[IndicadoresCompletosDict, Dict[str, Any]],
     df_diario: pd.DataFrame,
     estatisticas_lote: Optional[Dict[str, int]] = None,
     avisos_lote: Optional[List[str]] = None,
@@ -157,7 +158,7 @@ def exibir_relatorio_terminal(
 
 
 def exportar_relatorio_csv(
-    indicadores: Dict[str, Any],
+    indicadores: Union[IndicadoresCompletosDict, Dict[str, Any]],
     df_diario: pd.DataFrame,
     output_path: Union[str, Path],
 ) -> None:

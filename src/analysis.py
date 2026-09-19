@@ -1,8 +1,36 @@
 """Módulo de análise de dados e cálculo de indicadores de consumo e demanda."""
 
 import math
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, TypedDict, Union
 import pandas as pd
+
+
+class CoberturaDict(TypedDict):
+    """Estrutura tipada do resumo de cobertura temporal das medições."""
+    horas_medidas: int
+    horas_esperadas: int
+    horas_ausentes: int
+    percentual_cobertura: Optional[float]
+
+
+class IndicadoresCompletosDict(TypedDict):
+    """Estrutura tipada do conjunto completo de indicadores técnicos consolidados."""
+    total_medicoes: int
+    periodo_inicio: Optional[str]
+    periodo_fim: Optional[str]
+    potencia_media_kw: float
+    demanda_maxima_kw: float
+    horario_demanda_maxima: Optional[str]
+    consumo_total_kwh: float
+    tarifa_kwh: float
+    custo_estimado_reais: float
+    fator_carga: Optional[float]
+    fator_carga_percentual: Optional[float]
+    dia_maior_consumo: Optional[str]
+    consumo_maior_dia_kwh: float
+    dia_maior_consumo_completo: bool
+    cobertura: CoberturaDict
+    df_diario: pd.DataFrame
 
 
 def validar_intervalo_horas(intervalo_horas: float) -> None:
@@ -178,7 +206,7 @@ def identificar_dia_maior_consumo(df_diario: pd.DataFrame) -> Tuple[Optional[str
     return dia_str, consumo_kwh, dia_completo
 
 
-def calcular_cobertura_medicoes(df: pd.DataFrame, intervalo_horas: float = 1.0) -> Dict[str, Any]:
+def calcular_cobertura_medicoes(df: pd.DataFrame, intervalo_horas: float = 1.0) -> CoberturaDict:
     """Calcula a cobertura temporal das medições entre o início da primeira medição
     e o fim da última hora representada.
 
@@ -242,7 +270,7 @@ def calcular_custo_estimado(consumo_kwh: float, tarifa_kwh: float) -> float:
 
 def gerar_indicadores_completos(
     df: pd.DataFrame, tarifa_kwh: float, intervalo_horas: float = 1.0
-) -> Dict[str, Any]:
+) -> IndicadoresCompletosDict:
     """Gera um dicionário estruturado com todos os indicadores consolidados do
     histórico.
     """
@@ -320,7 +348,7 @@ def gerar_indicadores_completos(
 
 
 def gerar_sintese_executiva(
-    indicadores: Dict[str, Any],
+    indicadores: Union[IndicadoresCompletosDict, Dict[str, Any]],
     df_diario: pd.DataFrame,
     tem_lacunas: bool = False,
 ) -> str:

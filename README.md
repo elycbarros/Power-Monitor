@@ -189,4 +189,5 @@ Para aprofundamento técnico sobre o projeto:
 - [**Arquitetura do Sistema**](docs/arquitetura.md): Fluxo de dados, persistência transacional e trade-offs técnicos.
 - [**Dados e Metodologia**](docs/dados-e-metodologia.md): Dicionário de dados, unidades físicas, regras de validação por linha, formulação matemática e geração da curva de carga.
 - [**Validação e Testes**](docs/validacao.md): Como reproduzir os resultados em ambiente isolado, mapa da suíte de testes automatizados e análise crítica de cobertura.
+- [**Histórico de Alterações**](CHANGELOG.md): Registro de lançamentos, adições e correções no formato Keep a Changelog.
 - [**Especificação do Projeto**](PROJECT_SPEC.md): Requisitos da versão 1.0 e critérios de aceite concluídos.
