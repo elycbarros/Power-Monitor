@@ -1,6 +1,7 @@
 # PowerMonitor: Análise de Consumo e Demanda de Energia Elétrica
 
 [![CI - Testes e Qualidade](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/elycbarros/Power-Monitor/actions/workflows/ci.yml)
+[![Cobertura de Testes](https://img.shields.io/badge/cobertura-88%25-brightgreen.svg)](#5-executar-os-testes-automatizados-e-cobertura)
 
 O **PowerMonitor** é um projeto de portfólio desenvolvido para demonstrar a aplicação integrada de análise de dados, persistência relacional e conceitos práticos de Engenharia Elétrica na avaliação de séries temporais de consumo e demanda de energia.
 
@@ -109,20 +110,29 @@ python -m venv .venv
 
 ### 3. Instalar dependências
 ```bash
+# Dependências de produção:
 pip install -r requirements.txt
 
-# Opcional (para gerar ou atualizar a curva de carga):
+# Para ambiente de desenvolvimento, testes, cobertura e gráficos:
 pip install -r requirements-dev.txt
 ```
 
 ### 4. Executar o pipeline
 ```bash
+# Execução padrão (utiliza configurações de config.py):
 python main.py
+
+# Execução flexível via CLI (sobrescrevendo parâmetros):
+python main.py --csv data/medicoes.csv --tarifa 0.80
+
+# Exibir ajuda e opções de linha de comando:
+python main.py --help
 ```
 
-### 5. Executar os testes automatizados
+### 5. Executar os testes automatizados e cobertura
 ```bash
-pytest -v
+# Testes com relatório de cobertura por módulo:
+pytest -v --cov=src --cov=main --cov-report=term-missing
 ```
 
 ### 6. Gerar a Curva de Carga (Opcional)

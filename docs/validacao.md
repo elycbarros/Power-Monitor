@@ -75,20 +75,33 @@ A suíte conta com **28 testes automatizados** cobrindo unidades de cálculo el�
 | 26 | `test_pipeline_configuracao_incompativel_antes_da_persistencia` | [`main.py`](../main.py) | Garante interrupção com código `1` antes de criar banco ou persistir dados quando `INTERVALO_HORAS != 1.0` ou tarifa for negativa. |
 | 27 | `test_pipeline_deteccao_lacunas_em_importacoes_distintas` | [`main.py`](../main.py) | Garante que o pipeline emite alertas claros no terminal quando lotes separados geram lacunas no histórico consolidado. |
 | 28 | `test_pipeline_e2e_com_banco_temporario_e_retorno_falhas` | [`main.py`](../main.py) | Teste ponta a ponta: retorno `0` em sucesso, e retorno `1` em CSV sem dados válidos, falha de exportação ou erro na criação do banco. |
+| 29 | `test_cli_argumentos_e_execucao_customizada` | [`main.py`](../main.py) | Validação das opções de CLI com `argparse` (`--csv`, `--tarifa`, `--banco`, `--saida`) e execução do pipeline com parâmetros customizados. |
 
 ---
 
-## 3. Execução dos Testes
+## 3. Execução dos Testes e Relatório de Cobertura
 
-Para executar toda a suíte:
+Para executar toda a suíte com verificação de cobertura de código via `pytest-cov`:
 
 ```bash
-pytest -v
+pytest -v --cov=src --cov=main --cov-report=term-missing
 ```
 
-Resultado verificado:
+### Relatório de Cobertura Obtido (v1.0):
+
+| Módulo | Linhas de Código | Linhas Não Cobertas | Cobertura (%) | Escopo Principal |
+|---|---|---|---|---|
+| [`src/__init__.py`](../src/__init__.py) | 1 | 0 | **100%** | Inicialização do pacote |
+| [`src/analysis.py`](../src/analysis.py) | 155 | 9 | **94%** | Motor de cálculo elétrico e síntese |
+| [`src/report.py`](../src/report.py) | 123 | 10 | **92%** | Apresentação no terminal e CSV |
+| [`src/import_data.py`](../src/import_data.py) | 129 | 17 | **87%** | Ingestão, validação temporal e lacunas |
+| [`src/database.py`](../src/database.py) | 59 | 9 | **85%** | Persistência transacional e SQLite |
+| [`main.py`](../main.py) | 107 | 25 | **77%** | Orquestração do pipeline e CLI |
+| **TOTAL CONSOLIDADO** | **574** | **70** | **88%** | **Suíte completa** |
+
+Resultado da suíte:
 ```text
-============================== 28 passed in 0.34s ==============================
+============================== 29 passed in 0.36s ==============================
 ```
 
 ### Tolerâncias Numéricas Utilizadas nas Comparações SQL vs. Pandas

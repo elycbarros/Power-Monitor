@@ -765,3 +765,50 @@ def test_pipeline_e2e_com_banco_temporario_e_retorno_falhas(tmp_path, monkeypatc
     monkeypatch.setattr(config, "DATABASE_PATH", db_impossivel)
     monkeypatch.setattr(config, "OUTPUT_PATH", temp_out)
     assert main.executar_pipeline() == 1
+
+
+def test_cli_argumentos_e_execucao_customizada(tmp_path):
+    """Testa o processamento de flags de linha de comando com argparse
+
+    e a execução do pipeline com caminhos e parâmetros fornecidos via CLI.
+    """
+    import main
+    import config
+    from pathlib import Path
+
+    # 1. Parsing com valores default
+    args_default = main.parse_args([])
+    assert args_default.csv_path == config.CSV_PATH
+    assert args_default.tarifa_kwh == config.TARIFA_KWH
+    assert args_default.database_path == config.DATABASE_PATH
+    assert args_default.output_path == config.OUTPUT_PATH
+
+    # 2. Parsing com argumentos explícitos
+    custom_csv = tmp_path / "custom_medicoes.csv"
+    custom_db = tmp_path / "custom.db"
+    custom_out = tmp_path / "custom_relatorio.csv"
+
+    argv = [
+        "--csv", str(custom_csv),
+        "--tarifa", "0.95",
+        "--banco", str(custom_db),
+        "--saida", str(custom_out),
+    ]
+    args_custom = main.parse_args(argv)
+    assert args_custom.csv_path == custom_csv
+    assert args_custom.tarifa_kwh == 0.95
+    assert args_custom.database_path == custom_db
+    assert args_custom.output_path == custom_out
+
+    # 3. Execução direta passando parâmetros explicitamente
+    custom_csv.write_text("data_hora,potencia_kw\n2026-08-01 08:00,12.0\n", encoding="utf-8")
+    status = main.executar_pipeline(
+        csv_path=args_custom.csv_path,
+        tarifa_kwh=args_custom.tarifa_kwh,
+        database_path=args_custom.database_path,
+        output_path=args_custom.output_path,
+    )
+    assert status == 0
+    assert custom_db.exists()
+    assert custom_out.exists()
+
