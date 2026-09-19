@@ -10,13 +10,13 @@ import pandas as pd
 REQUIRED_COLUMNS = ["data_hora", "potencia_kw"]
 
 
-def identificar_lacunas_temporais(df: pd.DataFrame) -> List[pd.Timestamp]:
-    """Identifica horas ausentes na série temporal entre a primeira e a última
+def identificar_lacunas_temporais(
+    df: pd.DataFrame, intervalo_horas: float = 1.0
+) -> List[pd.Timestamp]:
+    """Identifica medições ausentes na série temporal entre a primeira e a última
+    medição registrada para o intervalo regular configurado.
 
-    medição registrada.
-
-    Contrato temporal v1: As medições devem ocorrer em intervalos regulares de
-    1 hora. Horas faltantes não são interpoladas nem preenchidas com zeros.
+    Não supõe interpolação nem preenchimento com zeros.
     """
     if df.empty or len(df) < 2 or "data_hora" not in df.columns:
         return []
@@ -25,16 +25,21 @@ def identificar_lacunas_temporais(df: pd.DataFrame) -> List[pd.Timestamp]:
     inicio = serie_temporal.iloc[0]
     fim = serie_temporal.iloc[-1]
 
-    grade_esperada = pd.date_range(inicio, fim, freq="1h")
+    minutos_intervalo = int(round(intervalo_horas * 60))
+    if minutos_intervalo <= 0:
+        minutos_intervalo = 60
+    freq = f"{minutos_intervalo}min" if minutos_intervalo < 60 else f"{int(round(intervalo_horas))}h"
+    grade_esperada = pd.date_range(inicio, fim, freq=freq)
     grade_presente = pd.DatetimeIndex(serie_temporal)
     horas_faltantes = grade_esperada.difference(grade_presente)
 
     return list(horas_faltantes)
 
 
-def formatar_resumo_lacunas(lacunas: List[pd.Timestamp]) -> List[str]:
+def formatar_resumo_lacunas(
+    lacunas: List[pd.Timestamp], intervalo_horas: float = 1.0
+) -> List[str]:
     """Resume uma lista de timestamps ausentes agrupando dias completos e
-
     apresentando exemplos sem poluir a saída com listagens extensas.
     """
     if not lacunas:
@@ -43,24 +48,29 @@ def formatar_resumo_lacunas(lacunas: List[pd.Timestamp]) -> List[str]:
     s_lacunas = pd.Series(lacunas)
     por_dia = s_lacunas.groupby(s_lacunas.dt.date).count()
 
+    passos_por_dia = int(round(24.0 / intervalo_horas))
     mensagens = []
-    dias_completos = por_dia[por_dia == 24].index.tolist()
-    dias_parciais = por_dia[por_dia < 24]
+    dias_completos = por_dia[por_dia == passos_por_dia].index.tolist()
+    dias_parciais = por_dia[por_dia < passos_por_dia]
+
+    rotulo_passos = "24h" if intervalo_horas == 1.0 else f"{passos_por_dia} medições (24h)"
 
     if dias_completos:
         dias_str = ", ".join(d.strftime("%d/%m/%Y") for d in dias_completos[:3])
         if len(dias_completos) > 3:
             dias_str += f" e mais {len(dias_completos) - 3} dia(s)"
-        mensagens.append(f"Dia(s) inteiramente ausente(s) (24h): {dias_str}.")
+        mensagens.append(f"Dia(s) inteiramente ausente(s) ({rotulo_passos}): {dias_str}.")
 
+    unidade = "hora(s)" if intervalo_horas == 1.0 else "medição(ões)"
     for dia, qtd in dias_parciais.items():
-        mensagens.append(f"Dia {dia.strftime('%d/%m/%Y')}: {qtd} hora(s) ausente(s).")
+        mensagens.append(f"Dia {dia.strftime('%d/%m/%Y')}: {qtd} {unidade} ausente(s).")
 
     return mensagens
 
 
 def load_and_validate_csv(
-    file_path: Union[str, Path]
+    file_path: Union[str, Path],
+    intervalo_horas: float = 1.0,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Carrega o arquivo CSV de medições, aplica validações técnicas e de engenharia,
 
@@ -155,8 +165,18 @@ def load_and_validate_csv(
             relatorio["data_invalida"] += 1
             continue
 
-        # 5. Conferir fuso e início exato de hora cheia (minuto, segundo e frações zero)
-        if dt.tzinfo is not None or dt.minute != 0 or dt.second != 0 or dt.microsecond != 0 or dt.nanosecond != 0:
+        # 5. Conferir fuso e alinhamento com a grade do intervalo (segundo e frações zero)
+        minutos_intervalo = int(round(intervalo_horas * 60))
+        if minutos_intervalo <= 0:
+            minutos_intervalo = 60
+
+        if (
+            dt.tzinfo is not None
+            or dt.second != 0
+            or dt.microsecond != 0
+            or dt.nanosecond != 0
+            or (dt.minute % minutos_intervalo != 0)
+        ):
             relatorio["fora_contrato_horario"] += 1
             continue
 
@@ -209,12 +229,13 @@ def load_and_validate_csv(
     df_valid = df_valid.sort_values("data_hora").reset_index(drop=True)
 
     # 9. Identificar lacunas temporais no lote importado
-    lacunas = identificar_lacunas_temporais(df_valid)
+    lacunas = identificar_lacunas_temporais(df_valid, intervalo_horas=intervalo_horas)
     if lacunas:
         relatorio["lacunas_detectadas"] = [ts.strftime("%Y-%m-%d %H:%M") for ts in lacunas]
-        resumo_lac = formatar_resumo_lacunas(lacunas)
+        resumo_lac = formatar_resumo_lacunas(lacunas, intervalo_horas=intervalo_horas)
+        unidade = "hora(s)" if intervalo_horas == 1.0 else "medição(ões)"
         relatorio["avisos"].append(
-            f"Detectada(s) {len(lacunas)} hora(s) ausente(s) no arquivo CSV entre "
+            f"Detectada(s) {len(lacunas)} {unidade} ausente(s) no arquivo CSV entre "
             f"{df_valid['data_hora'].iloc[0].strftime('%d/%m/%Y %H:%M')} e "
             f"{df_valid['data_hora'].iloc[-1].strftime('%d/%m/%Y %H:%M')}. "
             f"{' '.join(resumo_lac)}"

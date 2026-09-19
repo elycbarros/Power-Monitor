@@ -72,10 +72,11 @@ A suíte conta com **28 testes automatizados** cobrindo unidades de cálculo el�
 | 23 | `test_conflito_potencia_pequena_diferenca_sqlite` | [`src/database.py`](../src/database.py) | Rejeição de divergências numéricas sutis (ex: `10.00005` vs `10.0`), evitando tolerâncias silenciosas indevidas. |
 | 24 | `test_deteccao_lacunas_no_historico_multiplas_importacoes` | [`src/import_data.py`](../src/import_data.py) / [`main.py`](../main.py) | Detecção de lacunas de dias inteiros quando lotes separados são importados sucessivamente no banco. |
 | 25 | `test_concordancia_sql_e_pandas_usando_arquivo_queries` | [`sql/queries.sql`](../sql/queries.sql) | Carrega `sql/queries.sql` real, executa no SQLite e valida equivalência exata com Pandas para média, pico, agregações diárias com participação, resumo geral com fator de carga e dia de maior consumo. |
-| 26 | `test_pipeline_configuracao_incompativel_antes_da_persistencia` | [`main.py`](../main.py) | Garante interrupção com código `1` antes de criar banco ou persistir dados quando `INTERVALO_HORAS != 1.0` ou tarifa for negativa. |
-| 27 | `test_pipeline_deteccao_lacunas_em_importacoes_distintas` | [`main.py`](../main.py) | Garante que o pipeline emite alertas claros no terminal quando lotes separados geram lacunas no histórico consolidado. |
-| 28 | `test_pipeline_e2e_com_banco_temporario_e_retorno_falhas` | [`main.py`](../main.py) | Teste ponta a ponta: retorno `0` em sucesso, e retorno `1` em CSV sem dados válidos, falha de exportação ou erro na criação do banco. |
-| 29 | `test_cli_argumentos_e_execucao_customizada` | [`main.py`](../main.py) | Validação das opções de CLI com `argparse` (`--csv`, `--tarifa`, `--banco`, `--saida`) e execução do pipeline com parâmetros customizados. |
+| 26 | `test_pipeline_configuracao_incompativel_antes_da_persistencia` | [`main.py`](../main.py) | Garante interrupção com código `1` antes de criar banco ou persistir dados quando o intervalo não é suportado (ex: `0.33h`) ou tarifa for negativa. |
+| 27 | `test_suporte_intervalo_15_minutos_pipeline_completo` | [`src/import_data.py`](../src/import_data.py) / [`main.py`](../main.py) | Suporte completo a medições em 15 minutos (0.25h): validação de grade (`:00`, `:15`, `:30`, `:45`), auditoria de lacunas de 15 min e execução ponta a ponta com 96 medições/dia (240 kWh exatos). |
+| 28 | `test_pipeline_deteccao_lacunas_em_importacoes_distintas` | [`main.py`](../main.py) | Garante que o pipeline emite alertas claros no terminal quando lotes separados geram lacunas no histórico consolidado. |
+| 29 | `test_pipeline_e2e_com_banco_temporario_e_retorno_falhas` | [`main.py`](../main.py) | Teste ponta a ponta: retorno `0` em sucesso, e retorno `1` em CSV sem dados válidos, falha de exportação ou erro na criação do banco. |
+| 30 | `test_cli_argumentos_e_execucao_customizada` | [`main.py`](../main.py) | Validação das opções de CLI com `argparse` (`--csv`, `--tarifa`, `--banco`, `--saida`, `--intervalo`) e execução do pipeline com parâmetros customizados. |
 
 ---
 
@@ -87,21 +88,21 @@ Para executar toda a suíte com verificação de cobertura de código via `pytes
 pytest -v --cov=src --cov=main --cov-report=term-missing
 ```
 
-### Relatório de Cobertura Obtido (v1.0):
+### Relatório de Cobertura Obtido (v1.1):
 
 | Módulo | Linhas de Código | Linhas Não Cobertas | Cobertura (%) | Escopo Principal |
 |---|---|---|---|---|
 | [`src/__init__.py`](../src/__init__.py) | 1 | 0 | **100%** | Inicialização do pacote |
-| [`src/analysis.py`](../src/analysis.py) | 155 | 9 | **94%** | Motor de cálculo elétrico e síntese |
-| [`src/report.py`](../src/report.py) | 123 | 10 | **92%** | Apresentação no terminal e CSV |
-| [`src/import_data.py`](../src/import_data.py) | 129 | 17 | **87%** | Ingestão, validação temporal e lacunas |
+| [`src/analysis.py`](../src/analysis.py) | 157 | 9 | **94%** | Motor de cálculo elétrico e síntese |
+| [`src/report.py`](../src/report.py) | 124 | 10 | **92%** | Apresentação no terminal e CSV |
+| [`src/import_data.py`](../src/import_data.py) | 140 | 19 | **86%** | Ingestão, validação temporal sub-horária e lacunas |
 | [`src/database.py`](../src/database.py) | 59 | 9 | **85%** | Persistência transacional e SQLite |
-| [`main.py`](../main.py) | 107 | 25 | **77%** | Orquestração do pipeline e CLI |
-| **TOTAL CONSOLIDADO** | **574** | **70** | **88%** | **Suíte completa** |
+| [`main.py`](../main.py) | 110 | 25 | **77%** | Orquestração do pipeline e CLI |
+| **TOTAL CONSOLIDADO** | **591** | **72** | **88%** | **Suíte completa** |
 
 Resultado da suíte:
 ```text
-============================== 29 passed in 0.36s ==============================
+============================== 30 passed in 0.62s ==============================
 ```
 
 ### Tolerâncias Numéricas Utilizadas nas Comparações SQL vs. Pandas

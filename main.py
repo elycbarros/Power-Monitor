@@ -58,6 +58,13 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=config.OUTPUT_PATH,
         help="Caminho para exportação do relatório consolidado em CSV.",
     )
+    parser.add_argument(
+        "--intervalo",
+        dest="intervalo_horas",
+        type=float,
+        default=config.INTERVALO_HORAS,
+        help="Intervalo regular entre medições em horas (0.25 para 15 min, 0.5 para 30 min, 1.0 para 1h).",
+    )
     return parser.parse_args(argv)
 
 
@@ -82,10 +89,12 @@ def executar_pipeline(
     intervalo = intervalo_horas if intervalo_horas is not None else config.INTERVALO_HORAS
 
     # 1. Validação de Parâmetros de Configuração
-    if intervalo != 1.0:
+    INTERVALOS_SUPORTADOS = (0.25, 0.5, 1.0)
+    if intervalo not in INTERVALOS_SUPORTADOS:
         print(
-            f"\n[ERRO DE CONFIGURAÇÃO] O PowerMonitor v1.0 opera exclusivamente com medições "
-            f"em intervalos de uma hora (INTERVALO_HORAS = 1.0). Valor configurado: {intervalo}."
+            f"\n[ERRO DE CONFIGURAÇÃO] O PowerMonitor opera exclusivamente com intervalos "
+            f"regulares de 15 minutos (0.25h), 30 minutos (0.5h) ou 1 hora (1.0h). "
+            f"Valor configurado: {intervalo}."
         )
         return 1
 
@@ -97,9 +106,9 @@ def executar_pipeline(
         return 1
 
     # 2. Carregar e Validar Dados do CSV
-    print(f"-> Carregando arquivo de medições: {csv_file.name}...")
+    print(f"-> Carregando arquivo de medições: {csv_file.name} (intervalo: {intervalo}h)...")
     try:
-        df_valid, relatorio_validacao = load_and_validate_csv(csv_file)
+        df_valid, relatorio_validacao = load_and_validate_csv(csv_file, intervalo_horas=intervalo)
     except FileNotFoundError as e:
         print(f"\n[ERRO] {e}")
         print("Certifique-se de que o arquivo CSV de entrada exista antes de executar.")
@@ -161,12 +170,13 @@ def executar_pipeline(
             df_db = query_to_dataframe(conn, query_total)
 
             # Verificar lacunas temporais no histórico acumulado
-            lacunas_historico = identificar_lacunas_temporais(df_db)
+            lacunas_historico = identificar_lacunas_temporais(df_db, intervalo_horas=intervalo)
             avisos_historico = []
             if lacunas_historico:
-                resumo_hist = formatar_resumo_lacunas(lacunas_historico)
+                resumo_hist = formatar_resumo_lacunas(lacunas_historico, intervalo_horas=intervalo)
+                unidade_lac = "hora(s)" if intervalo == 1.0 else "medição(ões)"
                 avisos_historico.append(
-                    f"Detectada(s) {len(lacunas_historico)} hora(s) ausente(s) no histórico acumulado entre "
+                    f"Detectada(s) {len(lacunas_historico)} {unidade_lac} ausente(s) no histórico acumulado entre "
                     f"{df_db['data_hora'].iloc[0].strftime('%d/%m/%Y %H:%M')} e "
                     f"{df_db['data_hora'].iloc[-1].strftime('%d/%m/%Y %H:%M')}. "
                     f"{' '.join(resumo_hist)}"
@@ -225,5 +235,6 @@ if __name__ == "__main__":
             tarifa_kwh=cli_args.tarifa_kwh,
             database_path=cli_args.database_path,
             output_path=cli_args.output_path,
+            intervalo_horas=cli_args.intervalo_horas,
         )
     )

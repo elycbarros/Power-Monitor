@@ -664,8 +664,8 @@ def test_pipeline_configuracao_incompativel_antes_da_persistencia(tmp_path, monk
     monkeypatch.setattr(config, "DATABASE_PATH", temp_db)
     monkeypatch.setattr(config, "OUTPUT_PATH", temp_out)
 
-    # 1. INTERVALO_HORAS = 0.5 deve falhar antes de criar o banco
-    monkeypatch.setattr(config, "INTERVALO_HORAS", 0.5)
+    # 1. INTERVALO_HORAS não suportado (ex: 0.33h) deve falhar antes de criar o banco
+    monkeypatch.setattr(config, "INTERVALO_HORAS", 0.33)
     monkeypatch.setattr(config, "TARIFA_KWH", 0.75)
     assert main.executar_pipeline() == 1
     assert not temp_db.exists()
@@ -675,6 +675,79 @@ def test_pipeline_configuracao_incompativel_antes_da_persistencia(tmp_path, monk
     monkeypatch.setattr(config, "TARIFA_KWH", -1.0)
     assert main.executar_pipeline() == 1
     assert not temp_db.exists()
+
+
+def test_suporte_intervalo_15_minutos_pipeline_completo(tmp_path):
+    """Testa o suporte a dados em resolução de 15 minutos (0.25h):
+
+    validação de grade (00, 15, 30, 45 min), rejeição de minutos fora de grade,
+    detecção de lacunas de 15 min e execução ponta a ponta com cálculo dimensional exato.
+    """
+    import main
+    from src.import_data import load_and_validate_csv, identificar_lacunas_temporais
+
+    temp_csv = tmp_path / "medicoes_15min.csv"
+    temp_db = tmp_path / "power_15min.db"
+    temp_out = tmp_path / "relatorio_15min.csv"
+
+    # 1. Validação de grade: 00, 15, 30, 45 são válidos; 08:07 viola a grade de 15 min
+    csv_validacao = (
+        "data_hora,potencia_kw\n"
+        "2026-08-01 08:00,10.0\n"
+        "2026-08-01 08:15,12.0\n"
+        "2026-08-01 08:30,14.0\n"
+        "2026-08-01 08:45,16.0\n"
+        "2026-08-01 08:07,18.0\n"   # Fora da grade de 15 min
+    )
+    temp_csv_val = tmp_path / "teste_grade_15min.csv"
+    temp_csv_val.write_text(csv_validacao, encoding="utf-8")
+
+    df_valid, rel_val = load_and_validate_csv(temp_csv_val, intervalo_horas=0.25)
+    assert rel_val["total_lidos"] == 5
+    assert rel_val["registros_validos"] == 4
+    assert rel_val["fora_contrato_horario"] == 1
+    assert len(df_valid) == 4
+
+    # 2. Detecção de lacunas em resolução de 15 minutos
+    lacunas = identificar_lacunas_temporais(df_valid, intervalo_horas=0.25)
+    assert len(lacunas) == 0  # 08:00 a 08:45 contíguo
+
+    df_com_lacuna = pd.DataFrame({
+        "data_hora": pd.to_datetime(["2026-08-01 08:00", "2026-08-01 08:30"]),  # 08:15 ausente
+        "potencia_kw": [10.0, 12.0],
+    })
+    lacunas_15m = identificar_lacunas_temporais(df_com_lacuna, intervalo_horas=0.25)
+    assert len(lacunas_15m) == 1
+    assert lacunas_15m[0] == pd.Timestamp("2026-08-01 08:15:00")
+
+    # 3. Execução ponta a ponta com 1 dia completo de 15 min (96 medições de 10 kW)
+    # Energia esperada = 96 * (10.0 kW * 0.25h) = 240.0 kWh
+    timestamps_1dia = pd.date_range("2026-08-01 00:00", "2026-08-01 23:45", freq="15min")
+    assert len(timestamps_1dia) == 96
+
+    linhas = ["data_hora,potencia_kw"] + [f"{ts.strftime('%Y-%m-%d %H:%M')},10.0" for ts in timestamps_1dia]
+    temp_csv.write_text("\n".join(linhas), encoding="utf-8")
+
+    status = main.executar_pipeline(
+        csv_path=temp_csv,
+        tarifa_kwh=1.0,
+        database_path=temp_db,
+        output_path=temp_out,
+        intervalo_horas=0.25,
+    )
+    assert status == 0
+    assert temp_db.exists()
+    assert temp_out.exists()
+
+    df_resultado = pd.read_csv(temp_out)
+    assert len(df_resultado) == 1
+    assert df_resultado["dia"].iloc[0] == "2026-08-01"
+    assert df_resultado["total_medicoes"].iloc[0] == 96
+    assert df_resultado["dia_completo"].iloc[0] == True
+    assert df_resultado["consumo_kwh"].iloc[0] == 240.0
+    assert df_resultado["potencia_media_kw"].iloc[0] == 10.0
+    assert df_resultado["demanda_maxima_kw"].iloc[0] == 10.0
+
 
 
 def test_pipeline_deteccao_lacunas_em_importacoes_distintas(tmp_path, monkeypatch, capsys):

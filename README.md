@@ -122,8 +122,8 @@ pip install -r requirements-dev.txt
 # Execução padrão (utiliza configurações de config.py):
 python main.py
 
-# Execução flexível via CLI (sobrescrevendo parâmetros):
-python main.py --csv data/medicoes.csv --tarifa 0.80
+# Execução flexível via CLI (ex: dados em 15 min com tarifa customizada):
+python main.py --csv data/medicoes.csv --intervalo 0.25 --tarifa 0.80
 
 # Exibir ajuda e opções de linha de comando:
 python main.py --help
@@ -150,22 +150,22 @@ python scripts/gerar_curva_de_carga.py
 
 ### Potência (kW) vs. Energia (kWh)
 - **Potência ($P$, em kW):** Taxa instantânea ou média de demanda de energia elétrica durante o intervalo.
-- **Energia ($E$, em kWh):** Quantidade física consumida integrada no tempo ($E = \int P \, dt$, com $1\text{ kWh} = 1\text{ kW} \times 1\text{ h}$).
-- No PowerMonitor v1.0, adota-se amostragem horária regular ($\Delta t = 1{,}0\text{ h}$). Cada valor representa a **potência média demandada ao longo daquela hora**.
+- **Energia ($E$, em kWh):** Quantidade física consumida integrada no tempo ($E = \int P \, dt$, com $E = \sum P_i \times \Delta t$).
+- O PowerMonitor suporta intervalos amostrais regulares de 1 hora ($\Delta t = 1{,}0\text{ h}$), 30 minutos ($\Delta t = 0{,}5\text{ h}$) e 15 minutos ($\Delta t = 0{,}25\text{ h}$, padrão de concessionárias).
 
 ### Contrato Temporal, Lacunas e Dias Incompletos
-- **Contrato Horário:** Cada timestamp indica o início de uma hora cheia (`HH:00`). Amostras com minutos ou segundos fracionários são rejeitadas sem normalização silenciosa.
+- **Contrato Temporal:** Cada timestamp indica o início de um intervalo alinhado à grade amostral (`:00` para 1h; `:00` e `:30` para 30 min; `:00`, `:15`, `:30` e `:45` para 15 min). Frações de segundo são rejeitadas sem normalização silenciosa.
 - **Potência Negativa:** Valores com $P < 0$ não representam impossibilidade física na natureza (podem decorrer de geração fotovoltaica ou injeção em rede bidirecional), mas estão **fora do escopo de consumo unidirecional do PowerMonitor**, sendo descartados na validação.
-- **Lacunas no Histórico:** O sistema audita horas ausentes no CSV e no banco e emite avisos explícitos, **sem preenchimento artificial por zero nem interpolações**.
-- **Dias Incompletos:** Dias com menos de 24 medições horárias são sinalizados como parciais no relatório, somando estritamente os intervalos registrados.
+- **Lacunas no Histórico:** O sistema audita medições ausentes no CSV e no banco e emite avisos explícitos, **sem preenchimento artificial por zero nem interpolações**.
+- **Dias Incompletos:** Dias com amostragem incompleta (ex: menos de 24 medições para 1h ou menos de 96 para 15 min) são sinalizados como parciais no relatório, somando estritamente os intervalos registrados.
 
 ### Fator de Carga vs. Eficiência Energética
 - O fator de carga reportado ($51{,}94\%$) é a razão entre a potência média ($14{,}44\text{ kW}$) e o pico ($27{,}80\text{ kW}$).
 - Ele quantifica a **uniformidade da solicitação de carga no tempo**, não a eficiência física ou rendimento dos equipamentos instalados.
 
 ### Demanda de Pico vs. Demanda de Faturamento
-- O pico de **27,80 kW** reportado refere-se à **maior potência média horária observada** no período.
-- No faturamento regulado de energia elétrica (concessionárias), a demanda faturável utiliza janelas integradas de 15 minutos e regras contratuais específicas. O PowerMonitor não atua como simulador tarifário de concessionária.
+- O pico de **27,80 kW** reportado refere-se à **maior potência média observada** no período.
+- No faturamento regulado de energia elétrica (concessionárias), a demanda faturável utiliza janelas integradas de 15 minutos e regras contratuais específicas. Com a flag `--intervalo 0.25`, o PowerMonitor agora processa medições nativas nessa resolução de 15 minutos.
 - A presença de um pico às 18:00 sugere investigar quais equipamentos ou processos foram acionados no horário, sem inferir desperdício ou falha sem dados setoriais complementares.
 
 ### Estimativa Financeira Didática
@@ -174,12 +174,12 @@ python scripts/gerar_curva_de_carga.py
 
 ---
 
-## 7. Próximos Passos (v2.0)
+## 7. Próximos Passos Priorizados
 
 | Melhoria Proposta | Limitação que Resolve |
 |---|---|
-| **Suporte a Intervalos de 15 Minutos** | Permite analisar dados na mesma resolução adotada por medidores industriais e concessionárias. |
 | **Ingestão via API REST** | Substitui a dependência exclusiva de arquivos CSV locais por coleta automatizada de medidores IoT. |
+| **Simulação Tarifária Horossazonal (Posto Ponta / Fora Ponta)** | Diferenciação de tarifas por faixa horária de acordo com a estrutura tarifária horária regulada (ex: Tarifa Branca / Grupo A). |
 
 ---
 
