@@ -1,8 +1,25 @@
-#!/usr/bin/env python3
 """PowerMonitor: Pipeline de Análise de Consumo e Demanda de Energia Elétrica.
 
-Orquestra o fluxo de dados:
-CSV → Validação → Pandas → SQLite → SQL → Indicadores → Relatório
+Responsabilidades deste módulo (Orquestrador da Aplicação):
+- Ponto de entrada ("entry point") do sistema.
+- Orquestra a transição de dados entre todas as camadas da aplicação:
+  1. Ingestão e Saneamento: CSV bruto -> Validação de regras elétricas -> DataFrame limpo;
+  2. Persistência Relacional: DataFrame -> Transação SQLite ACID -> Histórico persistente;
+  3. Recuperação e Análise: Consulta SQL -> Séries temporais Pandas -> Indicadores de Engenharia;
+  4. Apresentação: Indicadores -> Relatório formatado no Terminal e Exportação em CSV.
+
+Conceitos de Programação e Engenharia de Software aplicados:
+- 'Orquestração vs Implementação': O arquivo principal NÃO faz contas nem escreve SQL
+  diretamente. Ele apenas delega para módulos especializados (`import_data`, `database`,
+  `analysis`, `report`), atuando como um maestro de uma orquestra.
+- 'Controle de Fluxo com Códigos de Saída (Exit Codes)':
+  Retorna '0' quando a execução é bem-sucedida e '1' quando ocorrem erros de validação
+  ou configuração. Isso permite integrar o script em rotinas agendadas (Cron, Airflow)
+  ou pipelines de CI/CD (GitHub Actions) que monitoram o status do processo.
+- 'Gerenciamento Defensivo de Recursos': Uso de blocos 'try...finally' para garantir
+  o fechamento de conexões de banco de dados (`conn.close()`), mesmo diante de exceções.
+- 'Interface de Linha de Comando (CLI) com argparse': Permite parametrização completa via flags
+  sem editar o código-fonte, viabilizando testes automatizados e execuções paralelas seguras.
 """
 
 import argparse
@@ -24,7 +41,28 @@ from src.report import exibir_relatorio_terminal, exportar_relatorio_csv
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
-    """Configura e processa argumentos de linha de comando do PowerMonitor."""
+    """Configura e processa argumentos de linha de comando do PowerMonitor.
+
+    Analogia & Utilidade:
+        Assim como um relé de proteção ou medidor digital possui botões ou portas de
+        comunicação para parametrização (ajuste de TC/TP, corrente nominal), um programa
+        profissional recebe parâmetros pela linha de comando sem exigir alteração de código.
+
+    Conceito de Programação:
+        - Módulo 'argparse': Biblioteca padrão do Python para parsing robusto de flags CLI.
+        - Valores padrão com 'config.py': Caso o usuário não especifique uma flag,
+          o sistema assume as constantes centralizadas no arquivo de configuração.
+        - Conversão automática de tipos ('type=Path', 'type=float'): Valida e converte
+          os argumentos digitados como string para os tipos adequados antes da execução.
+        - O parâmetro 'argv' opcional facilita testes unitários automatizados, permitindo
+          passar listas simuladas (ex: `parse_args(["--tarifa", "0.85"])`) sem manipular `sys.argv`.
+
+    Args:
+        argv: Lista opcional de argumentos de linha de comando (default lê de sys.argv).
+
+    Returns:
+        argparse.Namespace com os argumentos parseados e validados.
+    """
     parser = argparse.ArgumentParser(
         prog="python main.py",
         description="PowerMonitor: Pipeline de Análise de Consumo e Demanda de Energia Elétrica.",
@@ -75,10 +113,38 @@ def executar_pipeline(
     output_path: Optional[Union[str, Path]] = None,
     intervalo_horas: Optional[float] = None,
 ) -> int:
-    """Executa todas as etapas do pipeline do PowerMonitor.
+    """Executa sequencialmente todas as etapas do pipeline ETL e analítico do PowerMonitor.
 
-    Permite sobrescrever caminhos e parâmetros globais definidos em config.py.
-    Retorna 0 em caso de sucesso ou 1 em caso de erro/falha de integridade.
+    Analogia com Engenharia Elétrica:
+        Representa a automação do fluxo completo de telemetria predial/industrial:
+        1. Recepção dos dados de medição (leitura dos arquivos de registradores);
+        2. Saneamento metrológico (descarte de ruídos, negativos, carimbos corrompidos);
+        3. Armazenamento seguro em banco de dados histórico para auditoria legal;
+        4. Diagnóstico de qualidade da série temporal (cobertura e lacunas por falta de energia);
+        5. Consolidação de balanço de potência, energia acumulada, pico e fator de carga;
+        6. Emissão do boletim diário de operação e planilha para faturamento.
+
+    Conceito de Programação:
+        - Pipeline ETL (Extract, Transform, Load) + Análise:
+          Extract (CSV), Transform (limpeza e validação no Pandas), Load (SQLite transacional),
+          Analytics (cálculos vetoriais e agrupamentos) e Presentation (CLI e CSV).
+        - Princípio "Fail-Fast": Valida pré-condições (intervalo, tarifa, existência do arquivo)
+          logo no início, abortando com mensagem explícita e código de erro antes de abrir o banco.
+        - Gerenciamento de Conexão com 'try...finally': Garante que `conn.close()` seja executado
+          mesmo se houver erro no meio do cálculo de indicadores, prevenindo travamentos ("locks")
+          no arquivo SQLite.
+        - Reutilização de Resultados: Aproveita o 'df_diario' retornado por 'gerar_indicadores_completos',
+          evitando duplicar o processamento de agregação por dia.
+
+    Args:
+        csv_path: Caminho opcional do arquivo CSV (default: config.CSV_PATH).
+        tarifa_kwh: Tarifa opcional em R$/kWh (default: config.TARIFA_KWH).
+        database_path: Caminho opcional do banco SQLite (default: config.DATABASE_PATH).
+        output_path: Caminho opcional para exportar o relatório CSV (default: config.OUTPUT_PATH).
+        intervalo_horas: Passo temporal opcional em horas (default: config.INTERVALO_HORAS).
+
+    Returns:
+        0 se todo o pipeline concluiu com sucesso; 1 em caso de erro de configuração ou falha fatal.
     """
     print("\n[Iniciando PowerMonitor v1.0]")
 

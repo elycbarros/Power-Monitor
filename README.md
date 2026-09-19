@@ -140,6 +140,19 @@ pytest -v --cov=src --cov=main --cov-report=term-missing
 python scripts/gerar_curva_de_carga.py
 ```
 
+### 7. Executar o Estudo de Caso com Dados Reais (UCI)
+O PowerMonitor inclui um estudo de caso com dados reais de telemetria residencial de 1 minuto da base UCI (*Individual Household Electric Power Consumption*), comparando dias úteis e fins de semana no mês de Maio/2007 (44.640 medições agregadas sob política conservadora):
+```bash
+# 1. Preparar os dados horários derivados (salva em data/medicoes_uci_2007_05.csv):
+python scripts/preparar_estudo_caso_uci.py
+
+# 2. Executar o PowerMonitor sobre os dados reais (banco e saídas isolados):
+python main.py --csv data/medicoes_uci_2007_05.csv --banco database/estudo_caso.db --saida output/relatorio_estudo_caso.csv
+
+# 3. Gerar os gráficos comparativos (salva em docs/images/):
+python scripts/analisar_estudo_caso_graficos.py
+```
+
 ### Arquivos Gerados e Comportamento do Histórico:
 - **`database/power_monitor.db`**: Banco de dados SQLite persistente. Reexecuções com os mesmos dados mantêm o histórico inalterado (idempotência). Adicionar novas medições expande o histórico analisado.
 - **`output/relatorio.csv`**: Arquivo local sobrescrito a cada execução com o resumo diário consolidado (ignorado pelo Git para manter o repositório limpo).
@@ -186,8 +199,13 @@ python scripts/gerar_curva_de_carga.py
 ## 8. Documentação Técnica Complementar
 
 Para aprofundamento técnico sobre o projeto:
+- [**Estudo de Caso com Dados Reais**](docs/estudo-de-caso-dados-reais.md): Análise comparativa de consumo residencial (Dias Úteis vs. Fins de Semana) em Maio/2007 a partir do dataset da UCI, com gráficos, qualidade metrológica e limitações.
+- [**Guia de Estudo e Preparação Técnica**](docs/guia-de-estudo.md): Roteiro didático em 8 etapas para Engenheiros Eletricistas, rastreamento detalhado de cálculos, matriz de previsão de falhas e perguntas frequentes.
+
 - [**Arquitetura do Sistema**](docs/arquitetura.md): Fluxo de dados, persistência transacional e trade-offs técnicos.
 - [**Dados e Metodologia**](docs/dados-e-metodologia.md): Dicionário de dados, unidades físicas, regras de validação por linha, formulação matemática e geração da curva de carga.
 - [**Validação e Testes**](docs/validacao.md): Como reproduzir os resultados em ambiente isolado, mapa da suíte de testes automatizados e análise crítica de cobertura.
 - [**Histórico de Alterações**](CHANGELOG.md): Registro de lançamentos, adições e correções no formato Keep a Changelog.
 - [**Especificação do Projeto**](PROJECT_SPEC.md): Requisitos da versão 1.0 e critérios de aceite concluídos.
+
+

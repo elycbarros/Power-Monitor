@@ -1,4 +1,14 @@
-"""Módulo de importação e validação de dados de medições elétricas."""
+"""Módulo de importação e validação de dados de medições elétricas.
+
+Princípio de Engenharia de Dados: "Garbage In, Garbage Out"
+- Em sistemas elétricos reais (SCADA, smart meters, telemetria de subestações),
+  dados brutos frequentemente chegam com falhas de comunicação, carimbos de tempo
+  fora de ordem, valores ausentes, potências negativas indevidas ou fusos misturados.
+- Se dados corrompidos forem inseridos no banco de dados, todo o cálculo subsequente
+  de energia acumulada (kWh), demanda de pico (kW) e custo (R$) será invalidado.
+- Por isso, a validação neste módulo é ESTRITA e AUDITÁVEL: cada linha descartada é
+  contabilizada em categorias mutuamente exclusivas para transparência total.
+"""
 
 import math
 import re
@@ -7,6 +17,7 @@ from typing import Tuple, Dict, Any, Union, List
 import pandas as pd
 
 
+# Colunas contratuais obrigatórias no arquivo CSV de entrada
 REQUIRED_COLUMNS = ["data_hora", "potencia_kw"]
 
 
@@ -16,7 +27,30 @@ def identificar_lacunas_temporais(
     """Identifica medições ausentes na série temporal entre a primeira e a última
     medição registrada para o intervalo regular configurado.
 
-    Não supõe interpolação nem preenchimento com zeros.
+    Como funciona tecnicamente?
+    1. 'inicio' e 'fim': Delimitam o período coberto pela série temporal.
+    2. 'grade_esperada' (pd.date_range): Gera a sequência teórica perfeita de timestamps
+       que o relógio do medidor deveria ter registrado (ex: de 15 em 15 min ou de 1 em 1h).
+    3. 'grade_presente' (pd.DatetimeIndex): Conjunto dos timestamps efetivamente medidos.
+    4. 'difference': Operação de diferença de conjuntos matemáticos (Esperada - Presente).
+       Retorna a lista exata dos carimbos temporais faltantes.
+
+    Por que NUNCA preencher lacunas com zero (0) na Engenharia Elétrica?
+    - Uma medição de 0 kW é um estado físico real (disjuntor aberto, carga desligada).
+    - Uma lacuna (falha de amostragem) significa "dado desconhecido / medidor sem comunicação".
+    - Preencher lacunas com zero diminuiria artificialmente a potência média e o fator de carga,
+      gerando conclusões enganosas de eficiência ou consumo que não condizem com a realidade.
+
+    Args:
+        df: DataFrame com coluna 'data_hora'.
+        intervalo_horas: Passo da amostragem em horas (0.25 para 15min, 1.0 para 1h).
+
+    Returns:
+        List[pd.Timestamp]: Lista de timestamps esperados que não foram encontrados.
+
+    Exemplo:
+        >>> # df com medições às 08:00 e 10:00 (intervalo 1h):
+        >>> # identificar_lacunas_temporais(df, 1.0) -> [Timestamp('2026-08-01 09:00:00')]
     """
     if df.empty or len(df) < 2 or "data_hora" not in df.columns:
         return []
@@ -40,7 +74,13 @@ def formatar_resumo_lacunas(
     lacunas: List[pd.Timestamp], intervalo_horas: float = 1.0
 ) -> List[str]:
     """Resume uma lista de timestamps ausentes agrupando dias completos e
-    apresentando exemplos sem poluir a saída com listagens extensas.
+    apresentando exemplos sem poluir a saída com listagens extensas no terminal.
+
+    Conceito de Programação: 'groupby' em séries de datas
+    - 's_lacunas.dt.date': Extrai apenas a data civil (ano-mês-dia) de cada timestamp.
+    - 'groupby(...).count()': Conta quantas medições faltam em cada dia específico.
+    - Se a quantidade de faltas em um dia for igual ao total de amostras de 24h
+      (ex: 24 para 1h, ou 96 para 15min), o dia é classificado como "inteiramente ausente".
     """
     if not lacunas:
         return []
@@ -73,17 +113,38 @@ def load_and_validate_csv(
     intervalo_horas: float = 1.0,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Carrega o arquivo CSV de medições, aplica validações técnicas e de engenharia,
+    e retorna os dados válidos juntamente com um relatório contábil detalhado.
 
-    e retorna os dados válidos juntamente com um relatório detalhado.
+    Contrato Técnico de Ingestão:
+    1. Existência e Tamanho: Arquivo deve existir e possuir tamanho > 0 bytes.
+    2. Colunas Obrigatórias: Deve conter exatamente 'data_hora' e 'potencia_kw'.
+    3. Fuso e Formato Local: Formato YYYY-MM-DD HH:MM(:SS) ou ISO com 'T'. Fusos explícitos
+       (UTC, GMT, offsets '+03:00' ou 'Z') são rejeitados para evitar deslocamento silencioso
+       de horários (na cobrança de energia, postos de ponta dependem da hora civil local).
+    4. Alinhamento com a Grade Amostral:
+       - Para intervalo 1.0h: minuto deve ser estritamente ':00'.
+       - Para intervalo 0.5h: minutos devem ser ':00' ou ':30'.
+       - Para intervalo 0.25h: minutos devem ser ':00', ':15', ':30' ou ':45'.
+       - Segundos e frações (microssegundos/nanossegundos) devem ser zero.
+    5. Finitude Numérica: Valores de potência devem ser números finitos (math.isfinite).
+       Valores 'NaN', 'Inf' e '-Inf' são descartados.
+    6. Potência Não Negativa: A potência ativa em consumidores deve ser P >= 0 kW.
+    7. Conflito Interno: Se houver timestamps idênticos com potências distintas no CSV,
+       dispara ValueError imediato (conflito de telemetria).
+    8. Duplicatas Idênticas: Linhas idênticas são tratadas de forma idempotente (mantém 1ª).
 
-    Contrato Técnico da Versão 1.0:
-    - Cada timestamp deve representar o início exato de uma hora cheia (minuto, segundo e fração zero).
-    - Não são aceitos fusos horários explícitos (UTC, offset +HH:MM ou sufixo Z); espera-se horário local.
-    - Frações de segundo (microssegundos, nanossegundos) são estritamente rejeitadas para evitar perda de informação silenciosa.
-    - A coluna 'potencia_kw' representa a potência média demandada na hora seguinte (kW).
-    - Valores não finitos (NaN, Inf, -Inf) ou negativos são rejeitados.
-    - Conflitos de medição (mesmo timestamp com potências diferentes) geram erro explícito imediato.
-    - Duplicatas idênticas são tratadas de forma idempotente.
+    Identidade Contábil Auditável:
+        total_lidos == registros_validos + linhas_descartadas
+        (onde linhas_descartadas é a soma exata das categorias mutuamente exclusivas).
+
+    Args:
+        file_path: Caminho para o arquivo CSV de entrada.
+        intervalo_horas: Resolução amostral esperada em horas (default: 1.0).
+
+    Returns:
+        Tuple[pd.DataFrame, Dict[str, Any]]:
+            - DataFrame higienizado e ordenado com colunas ['data_hora', 'potencia_kw'].
+            - Dicionário com contadores de validação, avisos e lacunas detectadas.
     """
     path = Path(file_path)
 
@@ -127,12 +188,13 @@ def load_and_validate_csv(
 
     linhas_candidatas = []
 
-    # Avaliação por linha com categorias mutuamente exclusivas
+    # Avaliação por linha com categorias mutuamente exclusivas (o uso de 'continue' garante
+    # que cada linha descartada seja computada em exatamente UM contador de erro)
     for idx, row in df_raw.iterrows():
         raw_dt = row["data_hora"]
         raw_pot = row["potencia_kw"]
 
-        # 1. Valores nulos ou vazios
+        # 1. Valores nulos, vazios ou espaços em branco
         if pd.isna(raw_dt) or pd.isna(raw_pot) or str(raw_dt).strip() == "" or str(raw_pot).strip() == "":
             relatorio["ausentes_descartados"] += 1
             continue

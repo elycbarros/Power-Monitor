@@ -19,9 +19,18 @@ htmlcov/
 database/*.db
 output/*.csv
 
+# Dados externos brutos volumosos
+data/raw/
+data/*.zip
+data/*.txt
+
 # IDEs e editores
 .vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
+
+# Documentação privada e demonstrações (não subir ao repositório)
+docs/apresentacao.md
+*demo*

@@ -1,4 +1,19 @@
-"""Módulo de exibição e exportação de relatórios do PowerMonitor."""
+"""Módulo de exibição e exportação de relatórios do PowerMonitor.
+
+Responsabilidades deste módulo (Camada de Apresentação):
+- Converter dados analíticos brutos em informação legível para seres humanos e sistemas externos.
+- Exibir relatório formatado no terminal com padrão numérico brasileiro (separador de milhar '.' e decimal ',').
+- Renderizar tabelas alinhadas com indicadores operacionais e alertas de qualidade de dados.
+- Exportar série histórica diária consolidada para arquivo CSV externo.
+
+Conceitos de Programação e Engenharia de Software aplicados:
+- 'Separação de Responsabilidades' (SoC): A análise calcula números puros (`analysis.py`),
+  o banco armazena (`database.py`), e este módulo cuida estritamente da saída visual/arquivo.
+  Mudanças de leiaute ou formato numérico não afetam os cálculos físicos nem os testes analíticos.
+- 'Swap de caracteres sem colisão': Troca de '.' e ',' em strings usando marcador intermediário.
+- 'Defensive I/O': Criação automática de diretórios pais (`mkdir(parents=True, exist_ok=True)`)
+  e tratamento de erros com encadeamento de exceções (`raise ... from e`).
+"""
 
 from pathlib import Path
 from typing import Dict, Any, Union, Optional, List
@@ -7,7 +22,29 @@ from src.analysis import IndicadoresCompletosDict
 
 
 def formatar_numero_br(valor: float, casas_decimais: int = 2) -> str:
-    """Formata um float no padrão numérico brasileiro (1.234,56)."""
+    """Formata um float no padrão numérico brasileiro (1.234,56).
+
+    Analogia & Necessidade:
+        Em normas técnicas da ABNT e faturas de energia no Brasil, utiliza-se a vírgula
+        como separador decimal e o ponto para milhares. Em Python (e padrão anglo-saxão),
+        ocorre o inverso (1,234.56).
+
+    Conceito de Programação:
+        Técnica de swap sem colisão (Três Passos):
+        Se substituíssemos ',' por '.' diretamente, e depois '.' por ',', todos os pontos
+        virariam vírgulas (ex: 1,234.56 -> 1.234.56 -> 1,234,56).
+        Por isso, usa-se um caractere intermediário neutro ('X'):
+        1. ',' -> 'X'  => "1X234.56"
+        2. '.' -> ','  => "1X234,56"
+        3. 'X' -> '.'  => "1.234,56"
+
+    Args:
+        valor: Número em ponto flutuante a ser formatado.
+        casas_decimais: Quantidade de dígitos após a vírgula (default 2).
+
+    Returns:
+        String formatada (ex: 1500.5 -> "1.500,50").
+    """
     formato = f"{{:,.{casas_decimais}f}}"
     texto = formato.format(valor)
     return texto.replace(",", "X").replace(".", ",").replace("X", ".")
@@ -20,9 +57,30 @@ def exibir_relatorio_terminal(
     avisos_lote: Optional[List[str]] = None,
     avisos_historico: Optional[List[str]] = None,
 ) -> None:
-    """Exibe no terminal os resultados consolidados do histórico com clareza e
+    """Exibe no terminal os resultados consolidados do histórico com rigor técnico.
 
-    rigor técnico.
+    Analogia com Engenharia Elétrica:
+        Equivale à emissão do laudo técnico de inspeção de medição:
+        - Demonstração do fluxo de auditoria metrológica (linhas lidas vs válidas vs descartadas);
+        - Consolidação temporal (período total, taxa de cobertura, horas ausentes);
+        - Grandezas elétricas fundamentais (potência média, pico de demanda horária e horário);
+        - Fator de carga acompanhado da ressalva de engenharia (modulação vs eficiência);
+        - Tabela diária com segregação explícita de dias completos (24h) e parciais;
+        - Síntese executiva orientada a investigação operacional.
+
+    Conceito de Programação:
+        - Apresentação Amigável e Alinhamento: Utiliza f-strings com especificadores de
+          largura e alinhamento (`{dia:<12} | {meds:<10}`) para tabular dados no terminal
+          sem depender de bibliotecas externas pesadas (como tabulate).
+        - Tratamento de Dados Ausentes: Se o banco estiver vazio, exibe mensagem clara
+          e encerra a função sem levantar exceção desnecessária.
+
+    Args:
+        indicadores: Dicionário contendo os indicadores técnicos do histórico consolidado.
+        df_diario: DataFrame com o resumo diário de consumo e demanda.
+        estatisticas_lote: Dicionário opcional com a contabilidade da importação atual.
+        avisos_lote: Lista opcional de mensagens de anomalias no arquivo CSV atual.
+        avisos_historico: Lista opcional de avisos sobre a série histórica (ex: lacunas no banco).
     """
     separador_duplo = "=" * 76
     separador_simples = "-" * 76
@@ -162,10 +220,30 @@ def exportar_relatorio_csv(
     df_diario: pd.DataFrame,
     output_path: Union[str, Path],
 ) -> None:
-    """Exporta o relatório consolidado diário para um arquivo CSV.
+    """Exporta os indicadores consolidados diários para um arquivo CSV estruturado.
 
-    Garante que a pasta de destino exista antes de salvar.
-    Lança RuntimeError caso a operação de gravação falhe.
+    Analogia com Engenharia Elétrica:
+        Gera um arquivo de dados tabular padronizado para exportação, compatível com
+        planilhas de faturamento (Excel), sistemas de BI (PowerBI/Grafana) ou auditorias
+        externas de eficiência energética.
+
+    Conceito de Programação:
+        - Manipulação de Caminhos com 'pathlib.Path': Permite tratar caminhos de arquivos
+          de forma independente do sistema operacional (Windows usa '\\', Unix usa '/').
+        - 'mkdir(parents=True, exist_ok=True)': Criação defensiva de diretórios.
+          Se a pasta 'reports/' ainda não existir, ela é criada no momento da gravação,
+          evitando erros do tipo 'FileNotFoundError'.
+        - 'raise ... from e' (Exception Chaining): Técnica que preserva o traceback original
+          do Python (causa raiz do erro de I/O) enquanto disponibiliza uma mensagem de alto
+          nível clara ('RuntimeError') para o usuário final.
+
+    Args:
+        indicadores: Dicionário contendo os indicadores técnicos consolidados.
+        df_diario: DataFrame com o histórico diário de consumo.
+        output_path: Caminho (string ou Path) do arquivo CSV de destino.
+
+    Raises:
+        RuntimeError: Se houver falha de escrita no disco (permissão, disco cheio, etc.).
     """
     path = Path(output_path)
     try:
